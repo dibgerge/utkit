@@ -8,4 +8,4 @@ UTkit is used for performing signal processing on time series signals generally,
 
 * uSeries: representation of a time series.
 
-See the [doc pages](dibgerge.github.io/utkit) for more information and complete documentation.
+See the [doc pages](http://dibgerge.github.io/utkit) for more information and complete documentation.
