@@ -53,10 +53,14 @@ coverage.xml
 *.log
 
 # Sphinx documentation
-docs/_build/
+docs/build/
 
 # PyBuilder
 target/
 
 #Ipython Notebook
 .ipynb_checkpoints
+
+# eclipse files
+.project
+.pydevproject

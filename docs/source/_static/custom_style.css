@@ -1,0 +1,33 @@
+@import url("nature.css");
+
+dl.class dt{
+	background-color: #C2D7ED;
+	border-style: outset;
+	border-width: 1px;
+	border-color: #A5CBF2;
+}
+
+dl.method dt{
+	background-color: #E1E3E6;
+	border-style: outset;
+	border-width: 1px;
+	border-color: #D0D4D9;
+}
+
+dl.attribute dt{
+	background-color: #E1E3E6;
+	border-style: outset;
+	border-width: 1px;
+	border-color: #D0D4D9;
+}
+
+dl.docutils dt{
+	background-color: #ffffff;
+	border-width: 0;
+	font-weight: bold;
+}
+
+dl.first.last.docutils dt{
+	font-style: italic;
+	font-weight: normal;
+}
