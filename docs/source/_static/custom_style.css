@@ -1,5 +1,13 @@
 @import url("nature.css");
 
+
+dl.function dt{
+	background-color: #E1E3E6;
+	border-style: outset;
+	border-width: 1px;
+	border-color: #D0D4D9;
+}
+
 dl.class dt{
 	background-color: #C2D7ED;
 	border-style: outset;
@@ -31,3 +39,5 @@ dl.first.last.docutils dt{
 	font-style: italic;
 	font-weight: normal;
 }
+
+

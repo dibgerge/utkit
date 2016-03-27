@@ -1,13 +1,3 @@
-"""
-UTkit is used for performing signal processing on time series signals generally,
-which for example are encountered in Ultrasonics.
-The library extends the popular library :mod:`pandas` to support functions commonly
-used in UT analysis. The module :mod:`utkit` implements three classes:
-
-* :class:`utkit.RasterScan`: representation of a 2-D collection of time series (raster scan).
-* :class:`utkit.uFrame`: representation of a 1-D collection of time series (single line scan).
-* :class:`utkit.uSeries`: representation of a time series.
-"""
 import pandas as pd
 import numpy as np
 from scipy.fftpack import fft, fftfreq, fftshift, ifft
@@ -515,7 +505,7 @@ class uFrame(pd.DataFrame):
     in ultrasonics. The axis convention used is:
 
         * **Axis 1 (columns)**: *X*-direction
-        * **Axis 0 (index)**: *Y-direction
+        * **Axis 0 (index)**: *Y*-direction
 
     For example, in the context of ultrasonic inspection, the *X*-direction would represent
     the spatial line scan, and the *Y*-direction represents the signal time base, which can

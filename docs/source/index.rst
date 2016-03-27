@@ -6,12 +6,19 @@
 UTkit Documentation
 ===================
 
-
 .. automodule:: utkit
     :members:
     :undoc-members:
     :show-inheritance:
     :special-members: __call__
+    :member-order: groupwise
+
+IO module
+---------
+
+.. automodule:: utkit.io
+    :members:
+    :show-inheritance:
     :member-order: groupwise
 
 
