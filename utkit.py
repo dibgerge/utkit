@@ -70,11 +70,11 @@ class uSeries(pd.Series):
         """
         yout = self
         if 'e' in option:
-            yout = hilbert(yout).abs()
+            yout = np.abs(hilbert(yout))
         if 'n' in option:
-            yout = yout/max(yout.abs())
+            yout = yout/max(np.abs(yout))
         if 'd' in option:
-            yout = 20*np.log10(yout.abs())
+            yout = 20*np.log10(np.abs(yout))
         return uSeries(yout, index=self.index)
 
     # _____________________________________________________________ #
@@ -450,7 +450,7 @@ class uSeries(pd.Series):
         else:
             raise ValueError("The value for option is unknown. Should be: 'abs',"
                              "'env', 'peak', or 'fft'.")
-        return y.max()
+        return np.max(y.values)
 
     # _____________________________________________________________ #
     def energy(self, option='abs'):
@@ -729,10 +729,11 @@ class uFrame(pd.DataFrame):
             (float/uFrame) :
                 The uFrame values at the interpolation coordinates.
         """
-        if self._interp_fnc is None and self._interp_s != s:
+        if self._interp_fnc is None or self._interp_s != s:
             xv, yv, zv = self.flatten()
-            self._interp_fnc = SmoothBivariateSpline(xv, yv, zv, kx=1, ky=1, s=s)
+            self._interp_fnc = InterpolatedUnivariateSpline(xv, yv, zv, kx=1, ky=1, s=s)
             self._interp_s = s
+            self.apply(lambda n: InterpolatedUnivariateSpline(y, n.values))
 
         return self._interp_fnc(x, y)
 
@@ -754,12 +755,12 @@ class uFrame(pd.DataFrame):
         """
         ynew = self.copy()
         if axis is None:
-            ynew.index -= shift
-            ynew.columns -= shift
+            ynew.index -= shift[1]
+            ynew.columns -= shift[0]
         elif axis == 'Y' or axis == 0 or axis == 'index':
             ynew.index -= shift
         elif axis == 'X' or axis == 1 or axis == 'columns':
-            ynew.colums -= shift
+            ynew.columns -= shift
         else:
             raise ValueError('Unknwon axis value.')
         return ynew
@@ -869,12 +870,9 @@ class uFrame(pd.DataFrame):
         """
         Cx, Cy = self.centroid()
         if axis == 1 or axis == 'X' or axis == 'columns' or axis is None:
-            out = self.shift(np.mean(self.columns.values) - Cx, axis=1)
-        elif axis == 0 or axis == 'Y' or axis == 'index' or axis is None:
-            out = out.shift(np.mean(self.index.values) - Cy, axis=0)
-        else:
-            raise ValueError('Unknwon axis. Options are 0/\'Y\'/\'index\'' +
-                             'or 1/\'X\'/columns or None.')
+            out = self.roll(np.mean(self.X) - Cx, axis=1)
+        if axis == 0 or axis == 'Y' or axis == 'index' or axis is None:
+            out = out.roll(np.mean(self.Y) - Cy, axis=0)
         return out
 
     # _____________________________________________________________ #
@@ -954,7 +952,7 @@ class uFrame(pd.DataFrame):
             return (self.T - self.mean(axis=1)).T
 
     # _____________________________________________________________ #
-    def series(self, axis=0, option='max'):
+    def series(self, axis=1, option='max'):
         """
         Extracts a series depending on the given option.
 
@@ -1038,9 +1036,9 @@ class RasterScan(pd.Panel):
         """
         ynew = self.copy()
         if axis is None:
-            ynew.items -= shift
-            ynew.major_axis -= shift
-            ynew.minor_axis -= shift
+            ynew.items -= shift[0]
+            ynew.major_axis -= shift[1]
+            ynew.minor_axis -= shift[2]
         elif axis == 'Y' or axis == 0 or axis == 'items':
             ynew.items -= shift
         elif axis == 't' or axis == 1 or axis == 'major_axis':
@@ -1164,7 +1162,7 @@ class RasterScan(pd.Panel):
         """
         if depth == 'project':
             X, t, _ = self.iloc[0, :, :].flatten(skew_angle=skew_angle)
-            X -= X % self.Xs[2]
+            X = np.around(X / self.Xs[2])*self.Xs[2]
             df = uFrame(self.to_frame().values, index=[t, X], columns=self.axes[0])
             if option == 'energy':
                 return uFrame(df.var(level=1)).T
@@ -1189,8 +1187,8 @@ class RasterScan(pd.Panel):
 
         Returns:
             Y, T, X, values (tuple):
-                A 4-element tuple where each element is a flattened array of the RasterScan, and each representing
-                a point with coordinates Y, T, X and its value.
+                A 4-element tuple where each element is a flattened array of the RasterScan,
+                and each representing a point with coordinates Y, T, X and its value.
         """
         yv, tv, xv = np.meshgrid(self.Y, self.t, self.X, indexing='xy')
         return np.array([yv.ravel(), tv.ravel(), xv.ravel(), self.values.ravel()])
