@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
 from scipy.fftpack import fft, fftfreq, fftshift, ifft
-from scipy.signal import get_window, hilbert
-from scipy.interpolate import InterpolatedUnivariateSpline, SmoothBivariateSpline
+from scipy.signal import get_window, hilbert, fftconvolve
+from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import simps
 from pandas.tools.util import cartesian_product
+import matplotlib.pyplot as plt
 
 
 # _____________________________________________________________ #
@@ -78,6 +79,38 @@ class uSeries(pd.Series):
         return uSeries(yout, index=self.index)
 
     # _____________________________________________________________ #
+    def normalize(self, option='max'):
+        """
+
+        Args:
+            option:
+
+        Returns:
+
+        """
+        if option == 'energy':
+            return self/np.sqrt(self.energy())
+        elif option == 'max':
+            return self/np.max(np.abs(self))
+        else:
+            raise ValueError('Unknown option value.')
+
+    # _____________________________________________________________ #
+    def stretch(self, factor, n=None):
+        """
+
+        Args:
+            value:
+
+        Returns:
+
+        """
+
+        uf = self.fft().resize((1-factor)*self.Fs, fftbins=True)
+        t = np.arange(uf.size)/uf.range
+        return uSeries(np.real(ifft(uf)), index=t/factor)
+
+    # _____________________________________________________________ #
     def interp(self, key, k=3, ext=0):
         """
         Computes the value of the :class:`uSeries` at a given index value.
@@ -119,9 +152,42 @@ class uSeries(pd.Series):
         return self._interp_fnc(key)
 
     # _____________________________________________________________ #
+    def stcc(self, other, width, overlap=0, start=None, end=None, win_fcn='hann'):
+        """
+        Compute the short-time correlation coefficient of the signal.
+
+        Parameters:
+            width (float):
+                Window size that will be used in computing the short-time correlation
+                coefficient.
+            start (float):
+                Start index for which to compute the STCC.
+            end (float):
+                End index for which to compute the STCC.
+
+        Returns:
+            (array_like):
+                The computed STCC.
+        """
+        y1 = self.resample(self.Ts, start=start, end=end)
+        y2 = other.resample(self.Ts, start=start, end=end)
+
+        ind1, ind2 = 0, width
+        tau, tc = [], []
+        while ind2 <= y1.index[-1]:
+            c = fftconvolve(y1.window(index1=ind1, index2=ind2, win_fcn=win_fcn)(),
+                            y2.window(index1=ind1, index2=ind2, win_fcn=win_fcn)()[::-1],
+                            mode='full')
+            tau.append((y1.size - np.argmax(c))*self.Ts)
+            tc.append((ind1+ind2)/2.0)
+            ind1 += width-overlap
+            ind2 += width-overlap
+        return tc, tau
+
+    # _____________________________________________________________ #
     def resample(self, Ts=None, start=None, end=None, k=3, ext=1):
         """
-        Resamples the signal by changing the sampling rate, start index, or end index.
+        Resample the signal by changing the sampling rate, start index, or end index.
 
         Parameters:
             Ts (float, optional) :
@@ -164,6 +230,56 @@ class uSeries(pd.Series):
         return self.interp(tout, k=k, ext=ext)
 
     # _____________________________________________________________ #
+    def resize(self, interval, fill=0, fftbins=False):
+        """
+
+        Args:
+            n:
+            option:
+            isindex:
+            fftbins:
+
+        Returns:
+
+        """
+        n = int(interval / self.Ts)
+        # these are only used for fftbins case
+        nupper = np.ceil(n / 2.0)
+        nlower = np.floor(n / 2.0)
+        nl = nlower if self.size % 2 == 0 else nupper
+        nr = nlower if nl == nupper else nupper
+        print(interval)
+        if interval > 0:
+            if fill == 'mean':
+                fill = np.mean(self)
+            elif fill == 'max':
+                fill = np.max(self)
+            elif fill == 'min':
+                fill = np.min(self)
+
+            if fftbins:
+                left = uSeries(np.ones(nl)*fill,
+                               index=self.index.min()-np.arange(nl, 0, -1)*self.Ts)
+                right = uSeries(np.ones(nr)*fill,
+                                index=self.index.max()+np.arange(1, nr+1)*self.Ts)
+                upos = self[self.index >= 0].append(right)
+                uneg = left.append(self[self.index < 0])
+                unew = upos.append(uneg)
+            else:
+                unew = uSeries(np.ones(n)*fill,
+                               index=self.index[-1]+np.arange(1, n+1)*self.Ts)
+                unew = self.append(unew, verify_integrity=True)
+        elif interval < 0:
+            if fftbins:
+                unew = self.iloc[nl:nr]
+            else:
+                unew = self.iloc[:n]
+        else:
+            unew = self
+        return uSeries(unew)
+
+
+    # _____________________________________________________________ #
     def align(self, other, ext=1):
         """
         Aligns the Series to the indexbase of another given Series.
@@ -204,19 +320,14 @@ class uSeries(pd.Series):
           uSeries :
               The FFT of the signal.
         """
-        if self._fdomain is None:
-            self._fdomain = uSeries()
-
         if NFFT is None:
             NFFT = self.size
-
-        if self._fdomain.size != NFFT:
-            self._fdomain = uSeries(fftshift(fft(self, n=NFFT)),
-                                    index=fftshift(fftfreq(NFFT, self.Ts)))
+        uf = uSeries(fft(self, n=NFFT),
+                     index=fftfreq(NFFT, self.Ts))
         if ssb:
-            return self._fdomain[0:]
+            return uf[uf.index >= 0]
 
-        return self._fdomain
+        return uf
 
     # _____________________________________________________________ #
     def filter(self, cutoff, option='lp', win_fcn='boxcar'):
@@ -476,6 +587,10 @@ class uSeries(pd.Series):
             raise ValueError("The value for option is unknown. Should be either 'abs' or 'env'.")
 
     # _____________________________________________________________ #
+    def entropy(self):
+        return np.sum(self.values*np.log10(self.values))
+
+    # _____________________________________________________________ #
     def remove_mean(self):
         """
         Subtracts the mean of the signal.
@@ -490,7 +605,13 @@ class uSeries(pd.Series):
     @property
     def Ts(self):
         """ Get the signal sampling period. """
-        return np.mean(np.diff(self.index))
+        return np.mean(np.diff(self.index[self.index >= 0]))
+
+    # _____________________________________________________________ #
+    @property
+    def range(self):
+        """ Get the signal sampling period. """
+        return self.index.max() - self.index.min()
 
     # _____________________________________________________________ #
     @property
