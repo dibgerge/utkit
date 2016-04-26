@@ -16,3 +16,7 @@ Provides Adapters to read binary files generated from the following equipment:
 # import io.lecroy
 from .saft import saft
 from .lecroy import lecroy
+from .ultravision import readuv
+from .civa import civa_bscan
+
+
