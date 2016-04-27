@@ -5,12 +5,11 @@ from scipy.signal import get_window, hilbert, fftconvolve
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import simps
 from pandas.tools.util import cartesian_product
-import matplotlib.pyplot as plt
+from peakutils import peak
 
 
 # _____________________________________________________________ #
-# _____________________________________________________________ #
-class uSeries(pd.Series):
+class Signal(pd.Series):
     """
     Represents a time series object, by keeping track of the time index and corresponding
     values. This class extends the Pandas :class:`pandas.Series` class to make it more
@@ -25,7 +24,7 @@ class uSeries(pd.Series):
         Although the intent of this class is to represent time series signals, these signals
         can also be spatial series, where each point represents the value at a given
         spatial coordinate.
-        Thus the basis of the signal is reffered to as *index*, which is consistent with
+        Thus the basis of the signal is referred to as *index*, which is consistent with
         :mod:`pandas` nomenclature. The *index* would generally refer to time or space, depending
         on the nature of the signal.
     """
@@ -37,17 +36,17 @@ class uSeries(pd.Series):
 
         super().__init__(data=data, index=index, dtype=dtype, name=name,
                          copy=copy, fastpath=fastpath)
-        self._fdomain = None
-        self._interp_fnc = None
-        self._interp_k = None
-        self._interp_ext = None
+        # self._fdomain = None
+        # self._interp_fnc = None
+        # self._interp_k = None
+        # self._interp_ext = None
 
     @property
     def _constructor(self):
         """ Override the abstract class method so that all base class methods (i.e.
         methods in pd.Series) return objects of type utkit.Series when required.
         """
-        return uSeries
+        return Signal
 
     # _____________________________________________________________ #
     def __call__(self, option=''):
@@ -76,7 +75,7 @@ class uSeries(pd.Series):
             yout = yout/max(np.abs(yout))
         if 'd' in option:
             yout = 20*np.log10(np.abs(yout))
-        return uSeries(yout, index=self.index)
+        return Signal(yout, index=self.index)
 
     # _____________________________________________________________ #
     def normalize(self, option='max'):
@@ -96,6 +95,30 @@ class uSeries(pd.Series):
             raise ValueError('Unknown option value.')
 
     # _____________________________________________________________ #
+    def segment(self, thres, pulse_width, win_fcn='hann'):
+        """
+
+        :return:
+        """
+        peak_ind = peak.indexes(self.values, thres=thres, min_dist=int(pulse_width*self.Fs))
+        wind_len = np.mean(np.diff(self.index[peak_ind]))
+        parts = [self.window(index1=self.index[i]-wind_len/2.0,
+                             index2=self.index[i]+wind_len/2.0,
+                             win_fcn=win_fcn) for i in peak_ind]
+        return parts
+
+    # _____________________________________________________________ #
+    def tof(self, other):
+        """
+
+        :param other:
+        :return:
+        """
+        c = fftconvolve(self('n'), other('n')[::-1], mode='full')
+        ind = self.size - np.argmax(c)
+        return self.Ts * ind
+
+    # _____________________________________________________________ #
     def stretch(self, factor, n=None):
         """
 
@@ -108,12 +131,12 @@ class uSeries(pd.Series):
 
         uf = self.fft().resize((1-factor)*self.Fs, fftbins=True)
         t = np.arange(uf.size)/uf.range
-        return uSeries(np.real(ifft(uf)), index=t/factor)
+        return Signal(np.real(ifft(uf)), index=t / factor)
 
     # _____________________________________________________________ #
     def interp(self, key, k=3, ext=0):
         """
-        Computes the value of the :class:`uSeries` at a given index value.
+        Computes the value of the :class:`Signal` at a given index value.
         This method makes use of the SciPy interpolation method
         :class:`scipy.interpolate.InterpolatedUnivariateSpline`.
 
@@ -132,11 +155,11 @@ class uSeries(pd.Series):
 
         Returns:
             float:
-                If *key* is a float, then the value of :class:`uSeries` at given
+                If *key* is a float, then the value of :class:`Signal` at given
                 *key* is returned.
 
-            uSeries:
-                If *key* is a sequence, a new :class:`uSeries` with its time base
+            Signal:
+                If *key* is a sequence, a new :class:`Signal` with its time base
                 given by *key* is returned.
         """
         if self._interp_fnc is None or self._interp_k != k or self._interp_ext != ext:
@@ -146,9 +169,9 @@ class uSeries(pd.Series):
             self._interp_k = k
             self._interp_ext = ext
 
-        # if not a scalar, return a uSeries object
+        # if not a scalar, return a Signal object
         if hasattr(key, '__len__'):
-            return uSeries(self._interp_fnc(key), index=key)
+            return Signal(self._interp_fnc(key), index=key)
         return self._interp_fnc(key)
 
     # _____________________________________________________________ #
@@ -210,7 +233,7 @@ class uSeries(pd.Series):
                 See the Scipy documentation for more information.
 
         Returns:
-            uSeries object along the given interval.
+            Signal object along the given interval.
 
         .. note::
             If the given sampling rate is not a multiple of the signal interval
@@ -258,16 +281,16 @@ class uSeries(pd.Series):
                 fill = np.min(self)
 
             if fftbins:
-                left = uSeries(np.ones(nl)*fill,
-                               index=self.index.min()-np.arange(nl, 0, -1)*self.Ts)
-                right = uSeries(np.ones(nr)*fill,
-                                index=self.index.max()+np.arange(1, nr+1)*self.Ts)
+                left = Signal(np.ones(nl) * fill,
+                              index=self.index.min()-np.arange(nl, 0, -1)*self.Ts)
+                right = Signal(np.ones(nr) * fill,
+                               index=self.index.max()+np.arange(1, nr+1)*self.Ts)
                 upos = self[self.index >= 0].append(right)
                 uneg = left.append(self[self.index < 0])
                 unew = upos.append(uneg)
             else:
-                unew = uSeries(np.ones(n)*fill,
-                               index=self.index[-1]+np.arange(1, n+1)*self.Ts)
+                unew = Signal(np.ones(n) * fill,
+                              index=self.index[-1]+np.arange(1, n+1)*self.Ts)
                 unew = self.append(unew, verify_integrity=True)
         elif interval < 0:
             if fftbins:
@@ -276,7 +299,7 @@ class uSeries(pd.Series):
                 unew = self.iloc[:n]
         else:
             unew = self
-        return uSeries(unew)
+        return Signal(unew)
 
 
     # _____________________________________________________________ #
@@ -285,8 +308,8 @@ class uSeries(pd.Series):
         Aligns the Series to the indexbase of another given Series.
 
         Parameters:
-            other (uSeries) :
-                Another uSeries whose indexbase will be used as reference.
+            other (Signal) :
+                Another Signal whose indexbase will be used as reference.
 
             ext (int, optional) :
                 Controls the extrapolation mode if new indexbase is larger
@@ -294,7 +317,7 @@ class uSeries(pd.Series):
                 See the Scipy documentation for more information.
 
         Returns:
-            uSeries :
+            Signal :
                 The signal with the new time base.
         """
         return self.interp(other.index, ext=ext)
@@ -317,13 +340,13 @@ class uSeries(pd.Series):
               If true, returns only the single side band.
 
         Returns:
-          uSeries :
+          Signal :
               The FFT of the signal.
         """
         if NFFT is None:
             NFFT = self.size
-        uf = uSeries(fft(self, n=NFFT),
-                     index=fftfreq(NFFT, self.Ts))
+        uf = Signal(fft(self, n=NFFT),
+                    index=fftfreq(NFFT, self.Ts))
         if ssb:
             return uf[uf.index >= 0]
 
@@ -364,8 +387,8 @@ class uSeries(pd.Series):
                 specific window function.
 
         Returns:
-            uSeries :
-                The filter uSeries signal.
+            Signal :
+                The filter Signal signal.
         """
         fdomain = self.fft()
         index1 = 0
@@ -381,7 +404,7 @@ class uSeries(pd.Series):
             raise ValueError('The value for type is not recognized.')
 
         fdomain = fdomain.window(index1=index1, index2=index2, win_fcn=win_fcn, fftbins=True)
-        return uSeries(np.real(ifft(fftshift(fdomain))), index=self.index)
+        return Signal(np.real(ifft(fftshift(fdomain))), index=self.index)
 
     # _____________________________________________________________ #
     def window(self, index1=None, index2=None, is_positional=False,
@@ -407,8 +430,8 @@ class uSeries(pd.Series):
                  specific window function.
 
         Returns:
-          uSeries:
-              The windowed uSeries signal.
+          Signal:
+              The windowed Signal signal.
 
         .. note::
           If the window requires no parameters, then `win_fcn` can be a string.
@@ -417,7 +440,7 @@ class uSeries(pd.Series):
           arguments the needed parameters. If `win_fcn` is a floating point
           number, it is interpreted as the beta parameter of the kaiser window.
         """
-        wind = uSeries(0, index=self.index)
+        wind = Signal(0, index=self.index)
         if is_positional:
             index1 = wind.index[index1]
             index2 = wind.index[index2]
@@ -596,8 +619,8 @@ class uSeries(pd.Series):
         Subtracts the mean of the signal.
 
         Returns:
-            uSeries:
-                The :class:`uSeries` with its mean subtracted.
+            Signal:
+                The :class:`Signal` with its mean subtracted.
         """
         return self - self.mean()
 
@@ -654,7 +677,7 @@ class uFrame(pd.DataFrame):
     def _constructor(self):
         return uFrame
 
-    # _constructor_sliced = utkit.uSeries
+    # _constructor_sliced = utkit.Signal
 
     @property
     def _constructor_expanddim(self):
@@ -1047,8 +1070,8 @@ class uFrame(pd.DataFrame):
                 The meshgrids for the X-coordinates and Y-coordinates.
         """
         X, Y = np.meshgrid(self.X, self.Y, indexing=indexing)
-        X += Y*np.sin(np.deg2rad(skew_angle))
-        Y = Y*np.cos(np.deg2rad(skew_angle))
+        X += Y*np.sin(np.deg2rad(-1*skew_angle))
+        Y = Y*np.cos(np.deg2rad(-1*skew_angle))
         return X, Y
 
     # _____________________________________________________________ #
@@ -1079,15 +1102,15 @@ class uFrame(pd.DataFrame):
 
         Parameters:
             axis (int, optional) :
-                Axis along which to extract the :class:`uSeries`. Options are 0/'Y'/'index'
+                Axis along which to extract the :class:`Signal`. Options are 0/'Y'/'index'
                 or 1/'X'/'columns'.
 
             option (string, optional) : Currently only the option ``max`` is supported. This
                 returns the signal at the maximum point in the uFrame.
 
         Returns:
-            uSeries:
-                A new :class:`uSeries` object representing the extracted signal.
+            Signal:
+                A new :class:`Signal` object representing the extracted signal.
 
         """
         if option.lower() == 'max':
@@ -1345,7 +1368,7 @@ class RasterScan(pd.Panel):
             pts = tuple([p[i] for p in points])
             indexer.put(indlist, slice_indexer)
 
-            obj = uSeries(values[tuple(indexer)], index=slice_axis, name=pts)
+            obj = Signal(values[tuple(indexer)], index=slice_axis, name=pts)
             result = func(obj)
             results.append(result)
 
@@ -1362,7 +1385,7 @@ class RasterScan(pd.Panel):
             return self._constructor(**self._construct_axes_dict())
 
         # same ndim as current
-        if isinstance(results[0], uSeries):
+        if isinstance(results[0], Signal):
             arr = np.vstack([r.values for r in results])
             arr = arr.T.reshape(tuple([len(slice_axis)] + list(shape)))
             tranp = np.array([axis] + indlist).argsort()
