@@ -1,20 +1,19 @@
-""" Read binary files from SAFT
-"""
 import numpy as np
 import utkit as ut
 
 
 def saft(fname):
     """
-    Reads a file stored in SAFT format.
+    Reads a binary file stored in SAFT format. SAFT is a custom scanner at PNNL.
 
     Parameters:
         fname (string):
             Name of the file to open (with absolute or relative path).
+
     Returns:
-         :class:`utkit.RasterScan`, header:
-            A 2-element tuple where the first element is the RasterScan stored in the SAFT file,
-            returned as a :class:`utkit.RasterScan` object. The second element is a dictionary
+         :class:`utkit.Scan3D`, header:
+            A 2-element tuple where the first element is the Scan3D stored in the SAFT file,
+            returned as a :class:`utkit.Scan3D` object. The second element is a dictionary
             representing the SAFT file header fields.
     """
     # Number of bytes in the file header
@@ -45,7 +44,7 @@ def saft(fname):
     # the hardcoded constant 25.4e-3 is to convert from inches to meters
     X = np.arange(header['scan_xpoints'])*header['scan_xstep_in']*25.4e-3
     Y = np.arange(header['scan_ypoints'])*header['scan_ystep_in']*25.4e-3
-    return ut.RasterScan(data, items=Y, major_axis=t, minor_axis=X), header
+    return ut.Scan3D(data, items=Y, major_axis=t, minor_axis=X), header
 
 
 # ________________________________________________________________________#

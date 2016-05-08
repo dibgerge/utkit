@@ -5,13 +5,15 @@ import re
 
 def civa_bscan(fname):
     """
-    Reads a bscan file saved in CIVA.
+    Reads a B-scan txt file saved in CIVA-UT modeling software.
+
     Parameters:
         fname:
             Name of the file, including the fullpath if not in the current directory
-        Returns:
-            Bscan (:class:`utkit.uFrame`):
-              A uFrame object containing the B-scan
+
+    Returns:
+        Bscan (:class:`utkit.Scan2D`):
+            A Scan2D object containing the B-scan.
     """
     # this is the default start of the header in a civa b-scan txt file
     skip_lines = 12
@@ -31,4 +33,4 @@ def civa_bscan(fname):
     # convert from millimeters to meters
     X = coords[ind-1]*1e-3
     b = d[:, ind]
-    return utkit.uFrame(b, index=Y, columns=X)
+    return utkit.Scan2D(b, index=Y, columns=X)

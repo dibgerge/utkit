@@ -11,7 +11,7 @@ class TestSignal(unittest.TestCase):
         Fs = 100e6
         t  = np.arange(1000)/Fs
         s = Signal(np.sin(2*np.pi*fc*t), index=t)
-        self.assertIsInstance(s, pd.Series)
+        self.assertIsInstance(s[t[1]:], Signal)
 
 if __name__ == '__main__':
     unittest.main()

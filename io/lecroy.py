@@ -5,7 +5,7 @@ from datetime import datetime
 
 def lecroy(filename):
     """
-    Read binary waveform file (.trc) saved from LeCroy Waverunner Oscilloscope
+    Reads binary waveform file (.trc) saved from LeCroy Waverunner Oscilloscope.
 
     This function is based on the Matlab file ReadLeCroyBinaryWaveform.m
     by Jean-Daniel Deschenes,and also it is an adaptation (fixing multiple

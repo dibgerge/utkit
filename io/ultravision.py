@@ -1,14 +1,15 @@
 """
-Reads ultrasound scans saved in UltraVision (ZETEC software) text file format and returns a
-rasterScan object.
+
 """
 import pandas as pd
 import numpy as np
 import utkit
 
 
-def readuv(fname):
+def ultravision(fname):
     """
+    Reads ultrasound scans saved in UltraVision (ZETEC, Inc. software) text file format.
+
     :param
         fname: file name
         Fs: Sampling frequency (Hz)
@@ -37,7 +38,7 @@ def readuv(fname):
     u.index = [X.ravel(), Y.ravel()]
     u.columns = t
     p = u.to_panel()
-    return utkit.RasterScan(p.transpose(2, 0, 1).values,
-                            items=Yv,
-                            major_axis=t,
-                            minor_axis=Xv)
+    return utkit.Scan3D(p.transpose(2, 0, 1).values,
+                         items=Yv,
+                         major_axis=t,
+                         minor_axis=Xv)

@@ -1,32 +1,21 @@
-.. utkit documentation master file, created by
-   sphinx-quickstart on Fri Mar 25 16:16:32 2016.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+UTkit
+=====
 
-UTkit Documentation
-===================
+:mod:`utkit` extends the data structures in the popular library :mod:`pandas` in order to
+support short time signals generally encountered in wave propagation measurmenets. The main
+purpose of this library is to implement signal processing procedures for *signal shaping*,
+*transforms*, and *feature extraction* in a simple manner. All the while, keeping track and managing
+signal values and their corresponding indices (time/space values).
+
+At the core of the library, there are three data structures:
 
 .. automodule:: utkit
-    :members:
-    :undoc-members:
-    :show-inheritance:
-    :special-members: __call__
-    :member-order: groupwise
 
-IO module
----------
+IO Methods
+----------
+
+The library also provides methods to read datafiles generated from common equipment used in
+ultrasound inspections (such as data acquisition hardware and oscilloscopes). In addition,
+methods that read data from modeling software outputs are available.
 
 .. automodule:: utkit.io
-    :members:
-    :show-inheritance:
-    :member-order: groupwise
-
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-

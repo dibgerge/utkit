@@ -1,14 +1,14 @@
 """
-Provides Adapters to read binary files generated from the following equipment:
+.. currentmodule:: utkit.io
 
-* **LeCroy oscilloscopes** : Provided by :func:`utkit.io.lecroy.lecroy`
-* **SAFT scanners** : Provided by :func:`utkit.io.saft.saft`
+.. autosummary::
+    :nosignatures:
+    :toctree: generated/
 
-
-.. autofunction:: utkit.io.lecroy.lecroy
-
-.. autofunction:: utkit.io.saft.saft
-
+    saft
+    lecroy
+    ultravision
+    civa_bscan
 """
 # from __future__ import absolute_import
 
@@ -16,7 +16,7 @@ Provides Adapters to read binary files generated from the following equipment:
 # import io.lecroy
 from .saft import saft
 from .lecroy import lecroy
-from .ultravision import readuv
+from .ultravision import ultravision
 from .civa import civa_bscan
 
 

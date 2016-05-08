@@ -1,0 +1,53 @@
+utkit.Signal
+============
+
+.. currentmodule:: utkit
+
+Represents physical signals, by keeping track of the index (time/space) and corresponding
+values. This class extends the Pandas :class:`pandas.Series` class to make it more
+convenient to handle signals generally encountered in ultrasonics.
+
+The class constructor is the same as that used for :class:`pandas.Series`, with an extra
+option. If *data* is an array, and *index* is a scalar, then *index* is interpreted as
+a sampling interval, and the signal basis will be constructed as uniformly sampled
+starting from index 0.
+
+Signal Reshaping
+----------------
+
+.. autosummary::
+    :toctree:
+
+    Signal.align
+    Signal.filter
+    Signal.interp
+    Signal.resize
+    Signal.resample
+    Signal.remove_mean
+    Signal.normalize
+    Signal.segment
+    Signal.window
+
+Transforms
+----------
+
+.. autosummary::
+    :toctree:
+
+    Signal.fft
+
+Features
+--------
+
+.. autosummary::
+    :toctree:
+
+    Signal.max
+    Signal.energy
+    Signal.stcc
+    Signal.tof
+    Signal.center_frequency
+    Signal.peak_frequency
+    Signal.bandwidth
+    Signal.limits
+    Signal.entropy
