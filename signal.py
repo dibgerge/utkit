@@ -4,7 +4,7 @@ from scipy.fftpack import fft, fftfreq, fftshift, ifft
 from scipy.signal import get_window, hilbert, fftconvolve
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import simps
-# from peakutils import peak
+from . import peakutils
 
 
 # _____________________________________________________________ #
@@ -12,25 +12,43 @@ class Signal(pd.Series):
     """
     Represents physical signals, by keeping track of the index (time/space) and corresponding
     values. This class extends the Pandas :class:`pandas.Series` class to make it more
-    convenient to handle signals generally encountered in ultrasonics.
+    convenient to handle signals generally encountered in ultrasonics or RF.
 
-    The class constructor is the same as that used for :class:`pandas.Series`, with an extra
-    option. If *data* is an array, and *index* is a scalar, then *index* is interpreted as
-    a sampling interval, and the signal basis will be constructed as uniformly sampled
-    starting from index 0.
+    The class constructor is the same as that used for :class:`pandas.Series`. In addition,
+    if :attr:`data` is an array, and :attr:`index` is a scalar, then :attr:`index` is interpreted as
+    the sampling time, and the signal basis will be constructed as uniformly sampled at intervals
+    specified by the scalar :attr:`index` and starting from 0.
+
+    For example, to define a sine wave signal at 100 kHz and sampling interval of 1 microsecond,
+
+    .. code-block:: python
+
+        import numpy as np
+        import utkit
+
+        Ts = 1e-6
+        t = np.arange(100)*Ts
+        s = utkit.Signal(np.sin(2*np.pi*100e3*t), index=t)
+
+    the last line which calls the constructor of :class:`Signal` is also equivalent to:
+
+    .. code-block:: python
+
+        s = utkit.Signal(np.sin(2*np.pi*100e3*t), index=Ts)
+
+    The class :class:`Signal` provides various methods for signal reshaping, transforms,
+    and feature extraction.
     """
-    def __init__(self, data=None, index=None, dtype=None, name=None,
-                 copy=False, fastpath=False):
+    def __init__(self, data=None, index=None, *args, **kwargs):
         # Consider the case when index is scalar, then it is Ts
         if not hasattr(index, '__len__') and hasattr(data, '__len__') and index is not None:
             index = np.arange(len(data))*index
 
-        super().__init__(data=data, index=index, dtype=dtype, name=name,
-                         copy=copy, fastpath=fastpath)
+        super().__init__(data, index, *args, **kwargs)
         # self._fdomain = None
-        # self._interp_fnc = None
-        # self._interp_k = None
-        # self._interp_ext = None
+        self._interp_fnc = None
+        self._interp_k = None
+        self._interp_ext = None
 
     @property
     def _constructor(self):
@@ -69,44 +87,64 @@ class Signal(pd.Series):
         return Signal(yout, index=self.index)
 
     # _____________________________________________________________ #
-    def fft(self, nfft=None, ssb=False):
+    def fft(self, nfft=None, ssb=False, shift=True):
         """
-        Gives a convenient way to compute the Fourier transform of a time series signal.
+        Computes the Fast Fourier transform of the signal using :func:`scipy.fftpack.fft` function.
         The Fourier transform of a time series function is defined as:
 
         .. math::
            \mathcal{F}(y) ~=~ \int_{-\infty}^{\infty} y(t) e^{-2 \pi j f t}\,dt
 
-        Parameters:
-          NFFT (int, optional) :
-                  Specify the number of points for the FFT. The
-                  default is the length of the time series signal.
+        Parameters
+        ----------
+        nfft : int, optional
+            Specify the number of points for the FFT. The default is the length of
+            the time series signal.
 
-          ssb (boolean, optional) :
-              If true, returns only the single side band.
+        ssb : boolean, optional
+            If true, returns only the single side band (components corresponding to positive
+            frequency).
 
-        Returns:
-          Signal :
-              The FFT of the signal.
+        shift : boolean, optional
+            If true, returns the circularly shifted FFT spectrum (starting from :math:`\\frac{
+            -Fs}{2}` up to :math:`\\frac{Fs}{2}`. Otherwise, returns the conventional spectrum,
+            which starts from DC (0) to :math:`\\frac{Fs}{2}` and then from :math:`\\frac{Fs}{2}`
+            up to just before DC.
+
+        Returns
+        -------
+         : Signal
+            The FFT of the signal.
         """
         if nfft is None:
             nfft = self.size
-        uf = Signal(fft(self, n=nfft),
-                    index=fftfreq(nfft, self.Ts))
-        if ssb:
-            return uf[uf.index >= 0]
 
-        return uf
+        y = fft(self, n=nfft)
+        f = fftfreq(nfft, self.Ts)
+
+        if shift is True:
+            y = fftshift(y)
+            f = fftshift(f)
+
+        uf = Signal(y, index=f)
+        return uf[uf.index >= 0] if ssb else uf
 
     # _____________________________________________________________ #
     def normalize(self, option='max'):
         """
+        Normalizes the signal according to a given option.
 
-        Args:
-            option:
+        Parameters
+        ----------
+            option: string, optional
+                Method to be used to normalize the signal. The possible options are:
 
-        Returns:
-
+                - 'max' *(Default)* : Divide by the maximum of the signal, so that the normalized maximum has an amplitude of 1.
+                - 'energy': Divide by the signal energy.
+        Returns
+        -------
+            : Signal
+                Signal with normalized amplitude.
         """
         if option == 'energy':
             return self/np.sqrt(self.energy())
@@ -118,10 +156,34 @@ class Signal(pd.Series):
     # _____________________________________________________________ #
     def segment(self, thres, pulse_width, win_fcn='hann'):
         """
+        Segments the signal into a collection of signals, with each item in the collection,
+        representing the signal within a given time window. This is usually useful to
+        automate the extraction of multiple resolvable echoes.
 
-        :return:
+        Parameters
+        ----------
+        thres : float
+            A threshold value (in dB). Search for echoes will be only for signal values
+            above this given threshold. Note that the maximum threshold is 0 dB, since
+            the signal will be normalized by its maximum before searching for echoes.
+
+        pulse_width : float
+            The expected pulse_width. This should have the same units as the units of the Signal
+            index. If this is not known exactly, it is generally better to specify this
+            parameter to be slightly larger than the actual pulse_width.
+
+        win_fcn : string, array_like
+            The window type that will be used to window each extracted segment (or echo). See
+            :func:`scipy.signal.get_window()` for a complete list of available windows,
+            and how to pass extra parameters for a specific window type, if needed.
+
+        Returns
+        -------
+            : list
+                A list with elements of type :class:`Signal`. Each Signal element represents an
+                extracted segment.
         """
-        peak_ind = peak.indexes(self.values, thres=thres, min_dist=int(pulse_width*self.Fs))
+        peak_ind = peakutils.indexes(self.values, thres=thres, min_dist=int(pulse_width*self.Fs))
         wind_len = np.mean(np.diff(self.index[peak_ind]))
         parts = [self.window(index1=self.index[i]-wind_len/2.0,
                              index2=self.index[i]+wind_len/2.0,
@@ -131,9 +193,19 @@ class Signal(pd.Series):
     # _____________________________________________________________ #
     def tof(self, other):
         """
+        Computes the time of flight relative to another signal. Currently only cross-correlation
+        type of time of flight computation is supported.
 
-        :param other:
-        :return:
+        Parameters
+        ----------
+        other : Signal
+            Another signal than will be used for performing cross-correlation for time of flight
+            computation.
+
+        Returns
+        -------
+            : float
+                The computed time of flight, with the same units as the Signal index.
         """
         c = fftconvolve(self('n'), other('n')[::-1], mode='full')
         ind = self.size - np.argmax(c)
@@ -148,8 +220,10 @@ class Signal(pd.Series):
 
         Returns:
 
+        Notes
+        -----
+        This has not been implemented properly yet.
         """
-
         uf = self.fft().resize((1-factor)*self.Fs, fftbins=True)
         t = np.arange(uf.size)/uf.range
         return Signal(np.real(ifft(uf)), index=t / factor)
@@ -161,27 +235,30 @@ class Signal(pd.Series):
         This method makes use of the SciPy interpolation method
         :class:`scipy.interpolate.InterpolatedUnivariateSpline`.
 
-        Parameters :
-            key (float, array_like) :
-                The index value over which to compute the signal value.
+        Parameters
+        ----------
+        key : float, array_like
+            The index value over which to compute the signal value. Can be either a scalar or a
+            sequence of indices.
 
-            k (int, optional) :
-                Degree of the spline. See :class:`scipy.interpolate.InterpolatedUnivariateSpline`
-                documentation for more information.
+        k : int, optional
+            Degree of the spline. See :class:`scipy.interpolate.InterpolatedUnivariateSpline`
+            documentation for more information.
 
-            ext (int, optional) :
-                Controls the extrapolation mode. Default is to return zeros.
-                See :class:`scipy.interpolate.InterpolatedUnivariateSpline` documentation
-                for more information.
+        ext : int, optional
+            Controls the extrapolation mode. Default is to return zeros.
+            See :class:`scipy.interpolate.InterpolatedUnivariateSpline` documentation
+            for more information.
 
-        Returns:
-            float:
-                If *key* is a float, then the value of :class:`Signal` at given
-                *key* is returned.
+        Returns
+        -------
+        value : float
+            If *key* is a float, then the value of :class:`Signal` at given
+            *key* is returned.
 
-            Signal:
-                If *key* is a sequence, a new :class:`Signal` with its time base
-                given by *key* is returned.
+        value : Signal
+            If *key* is a sequence, a new :class:`Signal` with its time base
+            given by *key* is returned.
         """
         if self._interp_fnc is None or self._interp_k != k or self._interp_ext != ext:
             self._interp_fnc = InterpolatedUnivariateSpline(self.index,
@@ -200,21 +277,36 @@ class Signal(pd.Series):
         """
         Compute the short-time correlation coefficient of the signal.
 
-        Parameters:
-            width (float):
-                Window size that will be used in computing the short-time correlation
-                coefficient.
-            start (float):
-                Start index for which to compute the STCC.
-            end (float):
-                End index for which to compute the STCC.
+        Parameters
+        ----------
+        other : Signal
+            The other Signal that will be used to perform the short time cross correlation.
 
-        Returns:
-            (array_like):
-                The computed STCC.
+        width : float
+            Window size (in Signal index units) that will be used in computing the short-time
+            correlation coefficient.
+
+        overlap : float, optional
+            Units (index units) of overlap between consecutive computations.
+
+        start : float
+            Start index for which to compute the STCC.
+
+        end : float
+            End index for which to compute the STCC.
+
+        win_fcn : string, array_like
+            The window type applied to each computation. See :func:`scipy.signal.get_window()`
+            for a complete list of available windows, and how to pass extra parameters for a
+            specific window type, if needed.
+
+        Returns
+        -------
+        : array_like
+            The computed short tiem cross-correlation function.
         """
-        y1 = self.resample(self.Ts, start=start, end=end)
-        y2 = other.resample(self.Ts, start=start, end=end)
+        y1 = self.reshape(self.Ts, start=start, end=end)
+        y2 = other.reshape(self.Ts, start=start, end=end)
 
         ind1, ind2 = 0, width
         tau, tc = [], []
@@ -229,52 +321,74 @@ class Signal(pd.Series):
         return tc, tau
 
     # _____________________________________________________________ #
-    def resample(self, Ts=None, start=None, end=None, k=3, ext=1):
+    def reshape(self, ts=None, start=None, end=None, k=3, ext=1):
         """
-        Resample the signal by changing the sampling rate, start index, or end index.
+        Resample the signal by changing the sampling rate, start index, or end index. Spline
+        interpolation is used for performing the resampling.
 
-        Parameters:
-            Ts (float, optional) :
-                The new signal sampling rate. If not specified, defaults
-                to current signal sampling rate.
+        Parameters
+        ----------
+        Ts : float, optional
+            The new signal sampling rate. If not specified, defaults to current signal sampling
+            rate.
 
-            start (float, optional) :
-                The start index for resampling. If not specified,
-                defaults to minimum of current index.
+        start : float, optional
+            The start index for resampling. If not specified, defaults to minimum of current index.
 
-            end (float, optional) :
-                The end index for resampling. If not specified,
-                defaults to maximum of current index.
+        end : float, optional
+            The end index for resampling. If not specified, defaults to maximum of current index.
 
-            k (int, optional) :
-                Degree of the spline.See SciPy documentation for more information.
+        k : int, optional
+            Degree of the spline. See :class:`scipy.interpolate.InterpolatedUnivariateSpline`
+            documentation for more information.
 
-            ext (int, optional) :
-                Controls the extrapolation mode. Default is to return zeros.
-                See the Scipy documentation for more information.
+        ext : int, optional
+            Controls the extrapolation mode. Default is to return zeros. See the
+            :class:`scipy.interpolate.InterpolatedUnivariateSpline` documentation for more
+            information.
 
-        Returns:
-            Signal object along the given interval.
+        Returns
+        -------
+        : Signal
+            The resampled signal object.
 
-        .. note::
-            If the given sampling rate is not a multiple of the signal interval
-            (end - start), then the interval is cut short at the end.
+        Note
+        ----
+        If the given sampling rate is not a multiple of the signal interval (end - start),
+        then the interval is cut short at the end.
+
+        Warning
+        -------
+        This method overrides the :meth:`pandas.Series.resample` method, but it has a different
+        signature. This is because the base class method deals with Dates, and this method deals
+        with short time ranges. Thus, although the method names are the same, they have different
+        functionality.
         """
         # if all arguments are None, don't do anything!
-        if Ts is None and start is None and end is None:
+        if ts is None and start is None and end is None:
             return self
 
         if start is None:
             start = self.index.min()
         if end is None:
             end = self.index.max()
-        if Ts is None:
-            Ts = self.Ts
-        tout = np.arange(start, end+Ts, Ts)
+        if ts is None:
+            ts = self.Ts
+        tout = np.arange(start, end + ts, ts)
         return self.interp(tout, k=k, ext=ext)
 
     # _____________________________________________________________ #
     def resize(self, interval, fill=0, fftbins=False):
+        """
+
+        Args:
+            interval:
+            fill:
+            fftbins:
+
+        Returns:
+
+        """
         n = int(interval / self.Ts)
         # these are only used for fftbins case
         nupper = np.ceil(n / 2.0)
@@ -317,18 +431,20 @@ class Signal(pd.Series):
         """
         Aligns the Series to the indexbase of another given Series.
 
-        Parameters:
-            other (Signal) :
-                Another Signal whose indexbase will be used as reference.
+        Parameters
+        ----------
+        other : Signal
+            Another Signal whose indexbase will be used as reference.
 
-            ext (int, optional) :
-                Controls the extrapolation mode if new indexbase is larger
-                than current indexbase. Default is to return zeros.
-                See the Scipy documentation for more information.
+        ext : int, optional
+            Controls the extrapolation mode if new indexbase is larger
+            than current indexbase. Default is to return zeros.
+            See the Scipy documentation for more information.
 
-        Returns:
-            Signal :
-                The signal with the new time base.
+        Returns
+        -------
+        Signal : Signal
+            The signal with the new time base.
         """
         return self.interp(other.index, ext=ext)
 
@@ -623,3 +739,4 @@ class Signal(pd.Series):
     def Fs(self):
         """ Get the signal sampling frequency. """
         return 1.0/self.Ts
+

@@ -1,5 +1,12 @@
-@import url("nature.css");
+@import url("bizstyle.css");
 
+body {
+     margin: 0px 40px 0px 0px;
+}
+
+div.document {
+    background-color: #fbfbfb;
+}
 
 dl.function dt{
 	background-color: #E1E3E6;
@@ -29,15 +36,30 @@ dl.attribute dt{
 	border-color: #D0D4D9;
 }
 
-dl.docutils dt{
-	background-color: #ffffff;
-	border-width: 0;
-	font-weight: bold;
+div.body a {
+    text-decoration: none;
 }
 
-dl.first.last.docutils dt{
-	font-style: italic;
-	font-weight: normal;
+/*
+table.longtable tr, table.longtable td {
+    border: 1px solid white;
+    word-break: normal;
 }
 
+table.docutils.field-list td, table.docutils.field-list th, table.docutils.field-list tr {
+    border: 2px solid white;
+    word-break: normal;
+}
+*/
+table.docutils tr, table.docutils td {
+    border: 1px solid white;
+    word-break: keep-all;
+}
 
+/* WIDE DESKTOP STYLE */
+@media only screen and (min-width: 1176px) {
+body {
+    margin: 0 40px 0 0px;
+    width: 1175px;
+}
+}

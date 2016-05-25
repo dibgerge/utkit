@@ -1,5 +1,5 @@
-UTkit
-=====
+UTkit Documentation
+===================
 
 :mod:`utkit` extends the data structures in the popular library :mod:`pandas` in order to
 support short time signals generally encountered in wave propagation measurmenets. The main
