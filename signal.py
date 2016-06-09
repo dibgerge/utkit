@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.fftpack import fft, fftfreq, fftshift, ifft
-from scipy.signal import get_window, hilbert, fftconvolve
+from scipy.signal import get_window, hilbert, fftconvolve, spectrogram
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import simps
 from . import peakutils
@@ -191,6 +191,14 @@ class Signal(pd.Series):
         return parts
 
     # _____________________________________________________________ #
+    def stft(self, width, overlap=0, *args, **kwargs):
+        nperseg = int(width*self.Fs)
+        nol = int(overlap*self.Fs)
+        f, t, S = spectrogram(self.values, nperseg=nperseg, noverlap=nol, fs=self.Fs,
+                              mode='magnitude', *args, **kwargs)
+        return np.sum(S**2)
+
+    # _____________________________________________________________ #
     def tof(self, other):
         """
         Computes the time of flight relative to another signal. Currently only cross-correlation
@@ -307,18 +315,21 @@ class Signal(pd.Series):
         """
         y1 = self.reshape(self.Ts, start=start, end=end)
         y2 = other.reshape(self.Ts, start=start, end=end)
+        if start is None:
+            start = y1.index[0]
 
-        ind1, ind2 = 0, width
+        ind1, ind2 = start, start+width
         tau, tc = [], []
         while ind2 <= y1.index[-1]:
             c = fftconvolve(y1.window(index1=ind1, index2=ind2, win_fcn=win_fcn)(),
                             y2.window(index1=ind1, index2=ind2, win_fcn=win_fcn)()[::-1],
                             mode='full')
-            tau.append((y1.size - np.argmax(c))*self.Ts)
-            tc.append((ind1+ind2)/2.0)
+            #tau.append((y1.size - np.argmax(c))*self.Ts)
+            #tc.append((ind1+ind2)/2.0)
+            tc.append(np.max(c))
             ind1 += width-overlap
             ind2 += width-overlap
-        return tc, tau
+        return tc
 
     # _____________________________________________________________ #
     def reshape(self, ts=None, start=None, end=None, k=3, ext=1):
