@@ -40,15 +40,12 @@ class Signal(pd.Series):
     and feature extraction.
     """
     def __init__(self, data=None, index=None, *args, **kwargs):
-        # Consider the case when index is scalar, then it is Ts
+        # Consider the case when index is scalar, then it is ts
         if not hasattr(index, '__len__') and hasattr(data, '__len__') and index is not None:
             index = np.arange(len(data))*index
-
         super().__init__(data, index, *args, **kwargs)
-        # self._fdomain = None
-        self._interp_fnc = None
-        self._interp_k = None
-        self._interp_ext = None
+        if not self.index.is_monotonic_increasing:
+            raise ValueError('Index must be monotonically increasing.')
 
     @property
     def _constructor(self):
@@ -62,20 +59,21 @@ class Signal(pd.Series):
         """
         Returns the signal according to a given option.
 
-        Parameters:
-            options (string, char) :
-                The possible options are (combined options are allowed)
-                 +--------------------+--------------------------------------+
-                 | *option*           | Meaning                              |
-                 +====================+======================================+
-                 | '' *(Default)*     | Return the raw signal                |
-                 +--------------------+--------------------------------------+
-                 | 'n'                | normalized signal                    |
-                 +--------------------+--------------------------------------+
-                 | 'e'                | signal envelop                       |
-                 +--------------------+--------------------------------------+
-                 | 'd'                | decibel value                        |
-                 +--------------------+--------------------------------------+
+        Parameters
+        ----------
+        options (string, char) :
+            The possible options are (combined options are allowed)
+            +--------------------+--------------------------------------+
+            | *option*           | Meaning                              |
+            +====================+======================================+
+            | '' *(Default)*     | Return the raw signal                |
+            +--------------------+--------------------------------------+
+            | 'n'                | normalized signal                    |
+            +--------------------+--------------------------------------+
+            | 'e'                | signal envelop                       |
+            +--------------------+--------------------------------------+
+            | 'd'                | decibel value                        |
+            +--------------------+--------------------------------------+
         """
         yout = self
         if 'e' in option:
@@ -87,7 +85,7 @@ class Signal(pd.Series):
         return Signal(yout, index=self.index)
 
     # _____________________________________________________________ #
-    def fft(self, nfft=None, ssb=False, shift=True):
+    def fft(self, nfft=None, ssb=False):
         """
         Computes the Fast Fourier transform of the signal using :func:`scipy.fftpack.fft` function.
         The Fourier transform of a time series function is defined as:
@@ -105,12 +103,6 @@ class Signal(pd.Series):
             If true, returns only the single side band (components corresponding to positive
             frequency).
 
-        shift : boolean, optional
-            If true, returns the circularly shifted FFT spectrum (starting from :math:`\\frac{
-            -Fs}{2}` up to :math:`\\frac{Fs}{2}`. Otherwise, returns the conventional spectrum,
-            which starts from DC (0) to :math:`\\frac{Fs}{2}` and then from :math:`\\frac{Fs}{2}`
-            up to just before DC.
-
         Returns
         -------
          : Signal
@@ -119,15 +111,56 @@ class Signal(pd.Series):
         if nfft is None:
             nfft = self.size
 
-        y = fft(self, n=nfft)
-        f = fftfreq(nfft, self.Ts)
-
-        if shift is True:
-            y = fftshift(y)
-            f = fftshift(f)
-
-        uf = Signal(y, index=f)
+        uf = Signal(fftshift(fft(self, n=nfft)), index=fftshift(fftfreq(nfft, self.ts)))
         return uf[uf.index >= 0] if ssb else uf
+
+    # _____________________________________________________________ #
+    def window(self, index1=None, index2=None, is_positional=False, win_fcn='hann', fftbins=False):
+        """
+        Applies a window to the signal within a given time range.
+
+        Parameters
+        ----------
+        index1 : float or int, optional
+            The start index/position of the window. Default value is minimum of index.
+
+        index2 : float or int, optional
+            The end index/position of the window. Defaul value is maximum of index.
+
+        is_positional : bool, optional
+            Indicates whether the inputs `index1` and `index2` are positional or value
+            based. Default is :const:`False`, i.e. value based.
+
+        win_fcn : string/float/tuple, optional
+            The type of window to create. See the function
+            :func:`scipy.signal.get_window()` for a complete list of
+            available windows, and how to pass extra parameters for a
+            specific window function.
+
+        fftbins : bool, optional
+            If True, then applies a symmetric window with respect to index of value 0.
+
+        Returns
+        -------
+        Signal:
+            The windowed Signal signal.
+
+        .. note::
+          If the window requires no parameters, then `win_fcn` can be a string.
+          If the window requires parameters, then `win_fcn` must be a tuple
+          with the first argument the string name of the window, and the next
+          arguments the needed parameters. If `win_fcn` is a floating point
+          number, it is interpreted as the beta parameter of the kaiser window.
+        """
+        wind = Signal(0, index=self.index)
+        if is_positional:
+            index1 = wind.index[index1]
+            index2 = wind.index[index2]
+
+        wind[index1:index2] = get_window(win_fcn, len(wind[index1:index2]))
+        if fftbins:
+            wind[-index2:-index1] = get_window(win_fcn, len(wind[-index2:-index1]))
+        return self*wind
 
     # _____________________________________________________________ #
     def normalize(self, option='max'):
@@ -136,11 +169,12 @@ class Signal(pd.Series):
 
         Parameters
         ----------
-            option: string, optional
-                Method to be used to normalize the signal. The possible options are:
+        option: string, optional
+            Method to be used to normalize the signal. The possible options are:
 
-                - 'max' *(Default)* : Divide by the maximum of the signal, so that the normalized maximum has an amplitude of 1.
-                - 'energy': Divide by the signal energy.
+            - 'max' *(Default)* : Divide by the maximum of the signal, so that the normalized maximum has an amplitude of 1.
+            - 'energy': Divide by the signal energy.
+
         Returns
         -------
             : Signal
@@ -180,8 +214,8 @@ class Signal(pd.Series):
         Returns
         -------
             : list
-                A list with elements of type :class:`Signal`. Each Signal element represents an
-                extracted segment.
+            A list with elements of type :class:`Signal`. Each Signal element represents an
+            extracted segment.
         """
         peak_ind = peakutils.indexes(self.values, thres=thres, min_dist=int(pulse_width*self.Fs))
         wind_len = np.mean(np.diff(self.index[peak_ind]))
@@ -189,6 +223,48 @@ class Signal(pd.Series):
                              index2=self.index[i]+wind_len/2.0,
                              win_fcn=win_fcn) for i in peak_ind]
         return parts
+
+    # _____________________________________________________________ #
+    def tof(self, method='corr', *args, **kwargs):
+        """
+        Computes the time of flight relative to another signal. Currently only cross-correlation
+        type of time of flight computation is supported.
+
+        Parameters
+        ----------
+        method: string, optional
+            The method to be used for computing the signal time of flight. The following methods
+            are currently supported:
+
+            - corr : Use a correlation peak to compute the time of flight relative to another
+            signal. Another signal should be provided as input for performing the correlation.
+            - max : The maximum value of the signal is used to compute the time of flight. This
+            time of flight is relative to the signal's time 0.
+            - thresh : Compute the time the signal first crosses a given threshold value. The
+            threshold should  be given as argument in dB units. Note that the signal is
+            normalized by it's maximum for the purpose of finding the threshold crossing,
+            thus the maximum dB value is 0. If no threshold is given, the default is -12 dB.
+
+        Returns
+        -------
+            : float
+                The computed time of flight, with the same units as the Signal index.
+        """
+        if method.lower() == 'corr':
+            try:
+                other = args[0]
+            except IndexError:
+                raise ValueError('Another signal should be specified to compute the tof using the '
+                                 'correlation method.')
+            c = fftconvolve(self('n'), other('n')[::-1], mode='full')
+            ind = self.size - np.argmax(c)
+        elif method.lower() == 'max':
+            pass
+        elif method.lower() == 'thresh':
+            pass
+        else:
+            raise ValueError('method not supported. See documentation for supported methods.')
+        return self.ts * ind
 
     # _____________________________________________________________ #
     def stft(self, width, overlap=0, *args, **kwargs):
@@ -199,45 +275,7 @@ class Signal(pd.Series):
         return np.sum(S**2)
 
     # _____________________________________________________________ #
-    def tof(self, other):
-        """
-        Computes the time of flight relative to another signal. Currently only cross-correlation
-        type of time of flight computation is supported.
-
-        Parameters
-        ----------
-        other : Signal
-            Another signal than will be used for performing cross-correlation for time of flight
-            computation.
-
-        Returns
-        -------
-            : float
-                The computed time of flight, with the same units as the Signal index.
-        """
-        c = fftconvolve(self('n'), other('n')[::-1], mode='full')
-        ind = self.size - np.argmax(c)
-        return self.Ts * ind
-
-    # _____________________________________________________________ #
-    def stretch(self, factor, n=None):
-        """
-
-        Args:
-            value:
-
-        Returns:
-
-        Notes
-        -----
-        This has not been implemented properly yet.
-        """
-        uf = self.fft().resize((1-factor)*self.Fs, fftbins=True)
-        t = np.arange(uf.size)/uf.range
-        return Signal(np.real(ifft(uf)), index=t / factor)
-
-    # _____________________________________________________________ #
-    def interp(self, key, k=3, ext=0):
+    def compute_at(self, key, k=3, ext=0):
         """
         Computes the value of the :class:`Signal` at a given index value.
         This method makes use of the SciPy interpolation method
@@ -313,8 +351,8 @@ class Signal(pd.Series):
         : array_like
             The computed short tiem cross-correlation function.
         """
-        y1 = self.reshape(self.Ts, start=start, end=end)
-        y2 = other.reshape(self.Ts, start=start, end=end)
+        y1 = self.reshape(self.ts, start=start, end=end)
+        y2 = other.reshape(self.ts, start=start, end=end)
         if start is None:
             start = y1.index[0]
 
@@ -330,112 +368,6 @@ class Signal(pd.Series):
             ind1 += width-overlap
             ind2 += width-overlap
         return tc
-
-    # _____________________________________________________________ #
-    def reshape(self, ts=None, start=None, end=None, k=3, ext=1):
-        """
-        Resample the signal by changing the sampling rate, start index, or end index. Spline
-        interpolation is used for performing the resampling.
-
-        Parameters
-        ----------
-        Ts : float, optional
-            The new signal sampling rate. If not specified, defaults to current signal sampling
-            rate.
-
-        start : float, optional
-            The start index for resampling. If not specified, defaults to minimum of current index.
-
-        end : float, optional
-            The end index for resampling. If not specified, defaults to maximum of current index.
-
-        k : int, optional
-            Degree of the spline. See :class:`scipy.interpolate.InterpolatedUnivariateSpline`
-            documentation for more information.
-
-        ext : int, optional
-            Controls the extrapolation mode. Default is to return zeros. See the
-            :class:`scipy.interpolate.InterpolatedUnivariateSpline` documentation for more
-            information.
-
-        Returns
-        -------
-        : Signal
-            The resampled signal object.
-
-        Note
-        ----
-        If the given sampling rate is not a multiple of the signal interval (end - start),
-        then the interval is cut short at the end.
-
-        Warning
-        -------
-        This method overrides the :meth:`pandas.Series.resample` method, but it has a different
-        signature. This is because the base class method deals with Dates, and this method deals
-        with short time ranges. Thus, although the method names are the same, they have different
-        functionality.
-        """
-        # if all arguments are None, don't do anything!
-        if ts is None and start is None and end is None:
-            return self
-
-        if start is None:
-            start = self.index.min()
-        if end is None:
-            end = self.index.max()
-        if ts is None:
-            ts = self.Ts
-        tout = np.arange(start, end + ts, ts)
-        return self.interp(tout, k=k, ext=ext)
-
-    # _____________________________________________________________ #
-    def resize(self, interval, fill=0, fftbins=False):
-        """
-
-        Args:
-            interval:
-            fill:
-            fftbins:
-
-        Returns:
-
-        """
-        n = int(interval / self.Ts)
-        # these are only used for fftbins case
-        nupper = np.ceil(n / 2.0)
-        nlower = np.floor(n / 2.0)
-        nl = nlower if self.size % 2 == 0 else nupper
-        nr = nlower if nl == nupper else nupper
-        print(interval)
-        if interval > 0:
-            if fill == 'mean':
-                fill = np.mean(self)
-            elif fill == 'max':
-                fill = np.max(self)
-            elif fill == 'min':
-                fill = np.min(self)
-
-            if fftbins:
-                left = Signal(np.ones(nl) * fill,
-                              index=self.index.min()-np.arange(nl, 0, -1)*self.Ts)
-                right = Signal(np.ones(nr) * fill,
-                               index=self.index.max()+np.arange(1, nr+1)*self.Ts)
-                upos = self[self.index >= 0].append(right)
-                uneg = left.append(self[self.index < 0])
-                unew = upos.append(uneg)
-            else:
-                unew = Signal(np.ones(n) * fill,
-                              index=self.index[-1]+np.arange(1, n+1)*self.Ts)
-                unew = self.append(unew, verify_integrity=True)
-        elif interval < 0:
-            if fftbins:
-                unew = self.iloc[nl:nr]
-            else:
-                unew = self.iloc[:n]
-        else:
-            unew = self
-        return Signal(unew)
-
 
     # _____________________________________________________________ #
     def align(self, other, ext=1):
@@ -514,51 +446,6 @@ class Signal(pd.Series):
 
         fdomain = fdomain.window(index1=index1, index2=index2, win_fcn=win_fcn, fftbins=True)
         return Signal(np.real(ifft(fftshift(fdomain))), index=self.index)
-
-    # _____________________________________________________________ #
-    def window(self, index1=None, index2=None, is_positional=False,
-               win_fcn='hann', fftbins=False):
-        """
-        Applies a window to the signal within a given time range.
-
-        Parameters:
-          index1 (float or int, optional) :
-                 The start index/position of the window. Default value is minimum of index.
-
-          index2 (float or int, optional) :
-                 The end index/position of the window. Defaul value is maximum of index.
-
-          is_position (bool, optional):
-                 Indicates whether the inputs `index1` and `index2` are positional or value
-                 based. Default is :const:`False`, i.e. value based.
-
-          win_fcn (string, float, or tuple):
-                 The type of window to create. See the function
-                 :func:`scipy.signal.get_window()` for a complete list of
-                 available windows, and how to pass extra parameters for a
-                 specific window function.
-
-        Returns:
-          Signal:
-              The windowed Signal signal.
-
-        .. note::
-          If the window requires no parameters, then `win_fcn` can be a string.
-          If the window requires parameters, then `win_fcn` must be a tuple
-          with the first argument the string name of the window, and the next
-          arguments the needed parameters. If `win_fcn` is a floating point
-          number, it is interpreted as the beta parameter of the kaiser window.
-        """
-        wind = Signal(0, index=self.index)
-        if is_positional:
-            index1 = wind.index[index1]
-            index2 = wind.index[index2]
-
-        wind[index1:index2] = get_window(win_fcn, len(wind[index1:index2]))
-        if fftbins:
-            wind[-index2:-index1] = get_window(win_fcn, len(wind[-index2:-index1]))
-
-        return self*wind
 
     # _____________________________________________________________ #
     def center_frequency(self, threshold=-6):
@@ -719,10 +606,6 @@ class Signal(pd.Series):
             raise ValueError("The value for option is unknown. Should be either 'abs' or 'env'.")
 
     # _____________________________________________________________ #
-    def entropy(self):
-        return np.sum(self.values*np.log10(self.values))
-
-    # _____________________________________________________________ #
     def remove_mean(self):
         """
         Subtracts the mean of the signal.
@@ -735,7 +618,7 @@ class Signal(pd.Series):
 
     # _____________________________________________________________ #
     @property
-    def Ts(self):
+    def ts(self):
         """ Get the signal sampling period. """
         return np.mean(np.diff(self.index[self.index >= 0]))
 
@@ -749,5 +632,5 @@ class Signal(pd.Series):
     @property
     def Fs(self):
         """ Get the signal sampling frequency. """
-        return 1.0/self.Ts
+        return 1.0/self.ts
 
