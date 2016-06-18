@@ -64,3 +64,6 @@ target/
 # eclipse files
 .project
 .pydevproject
+
+# pyCharm files
+.idea/

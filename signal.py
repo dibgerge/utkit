@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy.fftpack import fft, fftfreq, fftshift, ifft
 from scipy.signal import get_window, hilbert, fftconvolve, spectrogram
-from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy.interpolate import InterpolatedUnivariateSpline, LSQUnivariateSpline
 from scipy.integrate import simps
 from . import peakutils
 
@@ -47,6 +47,13 @@ class Signal(pd.Series):
         if not self.index.is_monotonic_increasing:
             raise ValueError('Index must be monotonically increasing.')
 
+        self._interp_fnc = None
+        self._interp_kwargs = {'w': None,
+                               'bbox':[None, None],
+                               'k': 3,
+                               'ext': 0,
+                               'check_finite':  False}
+
     @property
     def _constructor(self):
         """ Override the abstract class method so that all base class methods (i.e.
@@ -55,9 +62,51 @@ class Signal(pd.Series):
         return Signal
 
     # _____________________________________________________________ #
-    def __call__(self, option=''):
+    def __call__(self, key, **kwargs):
         """
-        Returns the signal according to a given option.
+        Make the Signal act like a function, where given index values are computed using an
+        interpolant, and do not necessarily require to be at one of the current sample points.
+        This method makes use of the SciPy interpolation method
+        :class:`scipy.interpolate.InterpolatedUnivariateSpline`.
+
+        Parameters
+        ----------
+        key : float, array_like
+           The index value over which to compute the signal value. Can be either a scalar or a
+           sequence of indices.
+
+        Returns
+        -------
+        value : float
+           If *key* is a float, then the value of :class:`Signal` at given
+           *key* is returned.
+
+        value : Signal
+           If *key* is a sequence, a new :class:`Signal` with its time base
+           given by *key* is returned.
+
+        Notes
+        -----
+        This method take additional optional keyword arguments that are passed to the interpolant
+        function. To see a description of supported arguments, refer to the documentation of
+        :class:`scipy.interpolate.InterpolatedUnivariateSpline`.
+        """
+        same_args = True
+        for k in kwargs:
+            if self._interp_kwargs[k] != kwargs[k]:
+                same_args = False
+                self._interp_kwargs[k] = kwargs[k]
+
+        if self._interp_fnc is None or not same_args:
+            self._interp_fnc = InterpolatedUnivariateSpline(self.index, self.values, **kwargs)
+
+        return Signal(self._interp_fnc(key), index=key)
+
+    # _____________________________________________________________ #
+    def operate(self, option=''):
+        """
+        This is a convenience function for common operations on signals. Returns the signal
+        according to a given option.
 
         Parameters
         ----------
@@ -68,7 +117,7 @@ class Signal(pd.Series):
             +====================+======================================+
             | '' *(Default)*     | Return the raw signal                |
             +--------------------+--------------------------------------+
-            | 'n'                | normalized signal                    |
+            | 'n'                | normalized signal by max amplitude   |
             +--------------------+--------------------------------------+
             | 'e'                | signal envelop                       |
             +--------------------+--------------------------------------+
@@ -172,7 +221,8 @@ class Signal(pd.Series):
         option: string, optional
             Method to be used to normalize the signal. The possible options are:
 
-            - 'max' *(Default)* : Divide by the maximum of the signal, so that the normalized maximum has an amplitude of 1.
+            - 'max' *(Default)* : Divide by the maximum of the signal, so that the normalized
+            maximum has an amplitude of 1.
             - 'energy': Divide by the signal energy.
 
         Returns
@@ -225,7 +275,38 @@ class Signal(pd.Series):
         return parts
 
     # _____________________________________________________________ #
-    def tof(self, method='corr', *args, **kwargs):
+    def limits(self, threshold=-20):
+        """
+        Computes the index limits where the signal first goes above a given threshold,
+        and where it last goes below this threshold. Linear interpolation is used to find the
+        exact point for this crossing.
+
+        Parameters
+        ----------
+        threshold : float, optional
+            Units is dB. The value used to compute the where the signal first rises above and
+            last falls below.
+
+        Returns
+        -------
+        start_index, end_index (tuple (2,)):
+            A two element tuple representing the *start_index* and *end_index* of the signal.
+        """
+        if threshold > 0:
+            raise ValueError("threshold should be dB value <= 0, which is relative to the "
+                             "normalized maximum amplitude.")
+        senv = self('end')
+        ind = np.where(senv >= threshold)[0]
+        tout = []
+        # make linear interpolation to get time value at threshold
+        for i in [0, -1]:
+            x1, x2 = self.index[ind[i]-1], self.index[ind[i]]
+            y1, y2 = senv.iloc[ind[i]-1], senv.iloc[ind[i]]
+            tout.append((threshold-y1)*(x2-x1)/(y2-y1) + x1)
+        return tout[0], tout[1]
+
+    # _____________________________________________________________ #
+    def tof(self, method='corr', *args):
         """
         Computes the time of flight relative to another signal. Currently only cross-correlation
         type of time of flight computation is supported.
@@ -258,13 +339,17 @@ class Signal(pd.Series):
                                  'correlation method.')
             c = fftconvolve(self('n'), other('n')[::-1], mode='full')
             ind = self.size - np.argmax(c)
+            return self.ts * ind
         elif method.lower() == 'max':
-            pass
+            return self.normalize('max').idxmax()
         elif method.lower() == 'thresh':
-            pass
+            try:
+                thresh = args[0]
+            except IndexError:
+                thresh = -12
+            return self.limits(thresh)[0]
         else:
             raise ValueError('method not supported. See documentation for supported methods.')
-        return self.ts * ind
 
     # _____________________________________________________________ #
     def stft(self, width, overlap=0, *args, **kwargs):
@@ -273,50 +358,6 @@ class Signal(pd.Series):
         f, t, S = spectrogram(self.values, nperseg=nperseg, noverlap=nol, fs=self.Fs,
                               mode='magnitude', *args, **kwargs)
         return np.sum(S**2)
-
-    # _____________________________________________________________ #
-    def compute_at(self, key, k=3, ext=0):
-        """
-        Computes the value of the :class:`Signal` at a given index value.
-        This method makes use of the SciPy interpolation method
-        :class:`scipy.interpolate.InterpolatedUnivariateSpline`.
-
-        Parameters
-        ----------
-        key : float, array_like
-            The index value over which to compute the signal value. Can be either a scalar or a
-            sequence of indices.
-
-        k : int, optional
-            Degree of the spline. See :class:`scipy.interpolate.InterpolatedUnivariateSpline`
-            documentation for more information.
-
-        ext : int, optional
-            Controls the extrapolation mode. Default is to return zeros.
-            See :class:`scipy.interpolate.InterpolatedUnivariateSpline` documentation
-            for more information.
-
-        Returns
-        -------
-        value : float
-            If *key* is a float, then the value of :class:`Signal` at given
-            *key* is returned.
-
-        value : Signal
-            If *key* is a sequence, a new :class:`Signal` with its time base
-            given by *key* is returned.
-        """
-        if self._interp_fnc is None or self._interp_k != k or self._interp_ext != ext:
-            self._interp_fnc = InterpolatedUnivariateSpline(self.index,
-                                                            np.real(self.values),
-                                                            k=k, ext=ext)
-            self._interp_k = k
-            self._interp_ext = ext
-
-        # if not a scalar, return a Signal object
-        if hasattr(key, '__len__'):
-            return Signal(self._interp_fnc(key), index=key)
-        return self._interp_fnc(key)
 
     # _____________________________________________________________ #
     def stcc(self, other, width, overlap=0, start=None, end=None, win_fcn='hann'):
@@ -391,13 +432,10 @@ class Signal(pd.Series):
         """
         return self.interp(other.index, ext=ext)
 
-
-
     # _____________________________________________________________ #
     def filter(self, cutoff, option='lp', win_fcn='boxcar'):
         """
-        Applies a frequency domain filter to the signal. Returns a new Series,
-        and keeps the current object intact.
+        Applies a frequency domain filter to the signal.
 
         Parameters:
             cutoff (float or (2,) array_like) :
@@ -510,34 +548,6 @@ class Signal(pd.Series):
         Yn = fdomain('nd')
         frequencies = Yn[Yn >= threshold].index
         return frequencies.max() - frequencies.min()
-
-    # _____________________________________________________________ #
-    def limits(self, threshold=-20):
-        """
-        Computes the index limits where the signal first goes above a given threshold,
-        and where it last goes below this threshold.
-
-        Parameter:
-            threshold (float, optional):
-                Units is dB. The value used to compute the where the signal
-                first rises above and last falls below.
-
-        Returns:
-            start_index, end_index (tuple (2,)):
-                A two element tuple representing the *start_index* and *end_index* of the
-                signal.
-        """
-        if threshold > 0:
-            raise ValueError("threshold should be dB value <= 0.")
-        senv = self('end')
-        ind = np.where(senv >= threshold)[0]
-        tout = []
-        # make linear interpolation to get time value at threshold
-        for i in [0, -1]:
-            x1, x2 = self.index[ind[i]-1], self.index[ind[i]]
-            y1, y2 = senv.iloc[ind[i]-1], senv.iloc[ind[i]]
-            tout.append((threshold-y1)*(x2-x1)/(y2-y1) + x1)
-        return tout[0], tout[1]
 
     # _____________________________________________________________ #
     def max(self, option='peak', frequency=None):

@@ -30,7 +30,7 @@ def baseline(y, deg=3, max_it=100, tol=1e-3):
 
     Returns
     -------
-    ndarray
+    : ndarray
         Array with the baseline amplitude for every original point in *y*
     """
     order = deg + 1
