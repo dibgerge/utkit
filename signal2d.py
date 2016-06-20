@@ -219,35 +219,6 @@ class Signal2D(pd.DataFrame):
         return df
 
     # _____________________________________________________________ #
-    def interp(self, x, y, s=None):
-        """
-        Returns the value of the Signal2D at a given coordinates using
-        Scipy SmoothBivariateSpline interpolation. In this implementation,
-        the spline degree is set to 1.
-
-        Parameters:
-            x (float, array_like) :
-                The X-axis value(s) over which to compute the signal value.
-
-            y (float, array_like) :
-                The Y-axis value(s) over which to compute the signal value.
-
-            s (float, optional) :
-                Smoothing factor. See the Scipy documentation for more information.
-
-        Returns:
-            (float/Signal2D) :
-                The Signal2D values at the interpolation coordinates.
-        """
-        if self._interp_fnc is None or self._interp_s != s:
-            xv, yv, zv = self.flatten()
-            self._interp_fnc = InterpolatedUnivariateSpline(xv, yv, zv, kx=1, ky=1, s=s)
-            self._interp_s = s
-            self.apply(lambda n: InterpolatedUnivariateSpline(y, n.values))
-
-        return self._interp_fnc(x, y)
-
-    # _____________________________________________________________ #
     def shift_axis(self, shift, axis=None):
         """
         Applies shifting of a given axis.
