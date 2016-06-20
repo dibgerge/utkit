@@ -38,7 +38,7 @@ def ultravision(fname):
     u.index = [X.ravel(), Y.ravel()]
     u.columns = t
     p = u.to_panel()
-    return utkit.Scan3D(p.transpose(2, 0, 1).values,
-                         items=Yv,
-                         major_axis=t,
-                         minor_axis=Xv)
+    return utkit.Signal3D(p.transpose(2, 0, 1).values,
+                          items=Yv,
+                          major_axis=t,
+                          minor_axis=Xv)

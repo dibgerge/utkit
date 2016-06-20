@@ -14,9 +14,6 @@ Signal Reshaping
 
     Signal.align
     Signal.filter
-    Signal.interp
-    Signal.resize
-    Signal.resample
     Signal.remove_mean
     Signal.normalize
     Signal.segment
@@ -38,10 +35,8 @@ Features
 
     Signal.max
     Signal.energy
-    Signal.stcc
     Signal.tof
     Signal.center_frequency
     Signal.peak_frequency
     Signal.bandwidth
     Signal.limits
-    Signal.entropy

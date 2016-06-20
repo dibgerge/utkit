@@ -2,10 +2,10 @@ import pandas as pd
 import numpy as np
 from scipy.signal import hilbert
 from scipy.interpolate import InterpolatedUnivariateSpline
+from .signal3d import Signal3D
 
 
-
-class Scan2D(pd.DataFrame):
+class Signal2D(pd.DataFrame):
     """
     Extends :class:`pandas.DataFrame` class to support operations commonly required
     in ultrasonics. The axis convention used is:
@@ -20,7 +20,7 @@ class Scan2D(pd.DataFrame):
     The class constructor is similar as that of :class:`pandas.DataFrame` with the added
     option of specifying only the sampling intervals along the *X* and *Y* directions.
     Thus, if *index* and/or *columns* are scalars, which *data* is a 2-D array, then
-    the Scan2D basis are constructed starting from 0 at the given sampling intervals.
+    the Signal2D basis are constructed starting from 0 at the given sampling intervals.
 
     .. autosummary::
 
@@ -41,13 +41,13 @@ class Scan2D(pd.DataFrame):
 
     @property
     def _constructor(self):
-        return Scan2D
+        return Signal2D
 
     # _constructor_sliced = utkit.Signal
 
     @property
     def _constructor_expanddim(self):
-        return Scan3D
+        return Signal3D
 
     # _____________________________________________________________ #
     def __call__(self, option=''):
@@ -75,7 +75,7 @@ class Scan2D(pd.DataFrame):
             yout = yout/np.abs(yout).max().max()
         if 'd' in option:
             yout = 20*np.log10(np.abs(yout))
-        return Scan2D(yout, index=self.index, columns=self.columns)
+        return Signal2D(yout, index=self.index, columns=self.columns)
 
     # _____________________________________________________________ #
     def resample_axis(self, start=None, end=None, step=None, axis=0, fill='min'):
@@ -117,7 +117,7 @@ class Scan2D(pd.DataFrame):
                  +--------------------+--------------------------------------+
 
         Returns:
-            Scan2D:
+            Signal2D:
                 A new uFrame with its axis resampled.
         """
         if fill == 'min':
@@ -165,9 +165,9 @@ class Scan2D(pd.DataFrame):
 
         # construct the new dataframe with the new axis
         if axis == 0:
-            out = Scan2D(fill, index=new_axis, columns=ynew.columns)
+            out = Signal2D(fill, index=new_axis, columns=ynew.columns)
         elif axis == 1:
-            out = Scan2D(fill, index=ynew.index, columns=new_axis)
+            out = Signal2D(fill, index=ynew.index, columns=new_axis)
         out.loc[ynew.index.values, ynew.columns.values] = ynew.values
         return out
 
@@ -203,7 +203,7 @@ class Scan2D(pd.DataFrame):
                 information.
 
         Returns:
-            Scan2D:
+            Signal2D:
                 A new uFrame with its axes resampled.
         """
         # these are not needed (duplicated from resample_axis), but they can make execution faster
@@ -221,7 +221,7 @@ class Scan2D(pd.DataFrame):
     # _____________________________________________________________ #
     def interp(self, x, y, s=None):
         """
-        Returns the value of the Scan2D at a given coordinates using
+        Returns the value of the Signal2D at a given coordinates using
         Scipy SmoothBivariateSpline interpolation. In this implementation,
         the spline degree is set to 1.
 
@@ -236,8 +236,8 @@ class Scan2D(pd.DataFrame):
                 Smoothing factor. See the Scipy documentation for more information.
 
         Returns:
-            (float/Scan2D) :
-                The Scan2D values at the interpolation coordinates.
+            (float/Signal2D) :
+                The Signal2D values at the interpolation coordinates.
         """
         if self._interp_fnc is None or self._interp_s != s:
             xv, yv, zv = self.flatten()
@@ -260,7 +260,7 @@ class Scan2D(pd.DataFrame):
                 If 0 or 'Y', shift the index, if 1 or 'X', shift the columns. If None shift both.
 
         Returns:
-            Scan2D:
+            Signal2D:
                 A copy of uFrame with shiftes axes.
         """
         ynew = self.copy()
@@ -288,7 +288,7 @@ class Scan2D(pd.DataFrame):
                 If 0 or 'Y', scale the index, if 1 or 'X', scale the columns. If None scale both.
 
         Returns:
-            Scan2D:
+            Signal2D:
                 A copy of uFrame with scaled axes.
         """
         ynew = self.copy()
@@ -313,13 +313,13 @@ class Scan2D(pd.DataFrame):
                 The axis along which to flip the values. Options are 0/'Y'/'index' or 1/'X'/columns
 
         Returns:
-            Scan2D :
+            Signal2D :
                 New uFrame with axis flipped.
         """
         if axis == 'Y' or axis == 0 or axis == 'index':
-            return Scan2D(self.loc[::-1, :].values, index=self.index, columns=self.columns)
+            return Signal2D(self.loc[::-1, :].values, index=self.index, columns=self.columns)
         elif axis == 'X' or axis == 1 or axis == 'columns':
-            return Scan2D(self.loc[:, ::-1].values, index=self.index, columns=self.columns)
+            return Signal2D(self.loc[:, ::-1].values, index=self.index, columns=self.columns)
         else:
             raise ValueError('Unknown axis value. Shoud be 0/\'Y\'/\'index\'' +
                              'or 1/\'X\'/\'columns\'')
@@ -340,7 +340,7 @@ class Scan2D(pd.DataFrame):
                 See numpy.roll for more information.
 
         Returns:
-            Scan2D :
+            Signal2D :
                 The new circularly shifted uFrame.
         """
         indexes = int(np.around(value/self.Xs[axis]))
@@ -375,7 +375,7 @@ class Scan2D(pd.DataFrame):
                 on both axes.
 
         Returns:
-            Scan2D :
+            Signal2D :
                 The centered uFrame.
         """
         Cx, Cy = self.centroid()
@@ -392,7 +392,7 @@ class Scan2D(pd.DataFrame):
 
         Returns:
             X, Y ((2,) tuple) :
-                The X, Y coordinates of the Scan2D maximum.
+                The X, Y coordinates of the Signal2D maximum.
         """
         X = self.max(0).idxmax()
         Y = self.loc[:, X].idxmax()
@@ -401,7 +401,7 @@ class Scan2D(pd.DataFrame):
     # _____________________________________________________________ #
     def flatten(self, skew_angle=0):
         """
-        Flattens the Scan2D to give coordinates (X, Y, Values).
+        Flattens the Signal2D to give coordinates (X, Y, Values).
 
         Parameters:
             skew_angle (float, optional) :
@@ -411,7 +411,7 @@ class Scan2D(pd.DataFrame):
 
         Returns:
             X, Y, Z (tuple) :
-                The X-coordinates, Y-coordinates, Values of the Scan2D.
+                The X-coordinates, Y-coordinates, Values of the Signal2D.
         """
         XV, YV = self.meshgrid(skew_angle=skew_angle)
         return np.array([XV.ravel(), YV.ravel(), self.values.ravel()])
@@ -419,7 +419,7 @@ class Scan2D(pd.DataFrame):
     # _____________________________________________________________ #
     def meshgrid(self, indexing='xy', skew_angle=0):
         """
-        Gives a meshgrid of the Scan2D coordinates.
+        Gives a meshgrid of the Signal2D coordinates.
 
         Parameters:
             indexing ({'xy', 'ij'}, optional) :
@@ -451,7 +451,7 @@ class Scan2D(pd.DataFrame):
                 mean from the uFrame.
 
         Returns:
-            Scan2D :
+            Signal2D :
                 New uFrame with means subtracted along given axis.
         """
         if axis is None:
@@ -472,7 +472,7 @@ class Scan2D(pd.DataFrame):
                 or 1/'X'/'columns'.
 
             option (string, optional) : Currently only the option ``max`` is supported. This
-                returns the signal at the maximum point in the Scan2D.
+                returns the signal at the maximum point in the Signal2D.
 
         Returns:
             Signal:

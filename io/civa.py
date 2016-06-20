@@ -12,7 +12,7 @@ def civa_bscan(fname):
             Name of the file, including the fullpath if not in the current directory
 
     Returns:
-        Bscan (:class:`utkit.Scan2D`):
+        Bscan (:class:`utkit.Signal2D`):
             A Scan2D object containing the B-scan.
     """
     # this is the default start of the header in a civa b-scan txt file
@@ -33,4 +33,4 @@ def civa_bscan(fname):
     # convert from millimeters to meters
     X = coords[ind-1]*1e-3
     b = d[:, ind]
-    return utkit.Scan2D(b, index=Y, columns=X)
+    return utkit.Signal2D(b, index=Y, columns=X)

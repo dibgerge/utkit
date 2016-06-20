@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
 from scipy.fftpack import fft, fftfreq, fftshift, ifft
-from scipy.signal import get_window, hilbert, fftconvolve, spectrogram
-from scipy.interpolate import InterpolatedUnivariateSpline, LSQUnivariateSpline
+from scipy.signal import get_window, hilbert, fftconvolve, spectrogram, welch, coherence
+from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import simps
 from . import peakutils
+from .signal2d import Signal2D
 
 
 # _____________________________________________________________ #
@@ -39,19 +40,24 @@ class Signal(pd.Series):
     The class :class:`Signal` provides various methods for signal reshaping, transforms,
     and feature extraction.
     """
-    def __init__(self, data=None, index=None, *args, **kwargs):
+    def __init__(self, data=None, index=None, ts=None, *args, **kwargs):
+
         # Consider the case when index is scalar, then it is ts
-        if not hasattr(index, '__len__') and hasattr(data, '__len__') and index is not None:
-            index = np.arange(len(data))*index
+        if ts is not None and index is not None:
+            raise NotImplementedError('Cannot specify both ts and index for the time being.')
+
+        if ts is not None:
+            index = np.arange(len(data))*ts
+
         super().__init__(data, index, *args, **kwargs)
         if not self.index.is_monotonic_increasing:
             raise ValueError('Index must be monotonically increasing.')
 
         self._interp_fnc = None
         self._interp_kwargs = {'w': None,
-                               'bbox':[None, None],
+                               'bbox': [None, None],
                                'k': 3,
-                               'ext': 0,
+                               'ext': 1,
                                'check_finite':  False}
 
     @property
@@ -62,7 +68,7 @@ class Signal(pd.Series):
         return Signal
 
     # _____________________________________________________________ #
-    def __call__(self, key, **kwargs):
+    def __call__(self, key=None, ts=None, **kwargs):
         """
         Make the Signal act like a function, where given index values are computed using an
         interpolant, and do not necessarily require to be at one of the current sample points.
@@ -74,6 +80,10 @@ class Signal(pd.Series):
         key : float, array_like
            The index value over which to compute the signal value. Can be either a scalar or a
            sequence of indices.
+
+        ts : float, optional
+            *ts* can be specified only if *key* has not been specified. This will resample the
+            signal to the sample interval specified by *ts*.
 
         Returns
         -------
@@ -90,7 +100,22 @@ class Signal(pd.Series):
         This method take additional optional keyword arguments that are passed to the interpolant
         function. To see a description of supported arguments, refer to the documentation of
         :class:`scipy.interpolate.InterpolatedUnivariateSpline`.
+
+        Notes
+        -----
+        One difference in default values for the argument is that the extrapolation mode is set
+        to 'zeros', instead of 'extrapolate'. This is based on the assumption that the signal
+        goes to zero outside of its sampled range.
         """
+        if key is None and ts is None:
+            return self.copy()
+
+        if key is not None and ts is not None:
+            raise AttributeError("Only one of key or ts can be specified at one time, not both.")
+
+        if ts is not None:
+            key = np.arange(self.index[0], self.index[-1], ts)
+
         same_args = True
         for k in kwargs:
             if self._interp_kwargs[k] != kwargs[k]:
@@ -98,70 +123,9 @@ class Signal(pd.Series):
                 self._interp_kwargs[k] = kwargs[k]
 
         if self._interp_fnc is None or not same_args:
-            self._interp_fnc = InterpolatedUnivariateSpline(self.index, self.values, **kwargs)
-
-        return Signal(self._interp_fnc(key), index=key)
-
-    # _____________________________________________________________ #
-    def operate(self, option=''):
-        """
-        This is a convenience function for common operations on signals. Returns the signal
-        according to a given option.
-
-        Parameters
-        ----------
-        options (string, char) :
-            The possible options are (combined options are allowed)
-            +--------------------+--------------------------------------+
-            | *option*           | Meaning                              |
-            +====================+======================================+
-            | '' *(Default)*     | Return the raw signal                |
-            +--------------------+--------------------------------------+
-            | 'n'                | normalized signal by max amplitude   |
-            +--------------------+--------------------------------------+
-            | 'e'                | signal envelop                       |
-            +--------------------+--------------------------------------+
-            | 'd'                | decibel value                        |
-            +--------------------+--------------------------------------+
-        """
-        yout = self
-        if 'e' in option:
-            yout = np.abs(hilbert(yout))
-        if 'n' in option:
-            yout = yout/max(np.abs(yout))
-        if 'd' in option:
-            yout = 20*np.log10(np.abs(yout))
-        return Signal(yout, index=self.index)
-
-    # _____________________________________________________________ #
-    def fft(self, nfft=None, ssb=False):
-        """
-        Computes the Fast Fourier transform of the signal using :func:`scipy.fftpack.fft` function.
-        The Fourier transform of a time series function is defined as:
-
-        .. math::
-           \mathcal{F}(y) ~=~ \int_{-\infty}^{\infty} y(t) e^{-2 \pi j f t}\,dt
-
-        Parameters
-        ----------
-        nfft : int, optional
-            Specify the number of points for the FFT. The default is the length of
-            the time series signal.
-
-        ssb : boolean, optional
-            If true, returns only the single side band (components corresponding to positive
-            frequency).
-
-        Returns
-        -------
-         : Signal
-            The FFT of the signal.
-        """
-        if nfft is None:
-            nfft = self.size
-
-        uf = Signal(fftshift(fft(self, n=nfft)), index=fftshift(fftfreq(nfft, self.ts)))
-        return uf[uf.index >= 0] if ssb else uf
+            self._interp_fnc = InterpolatedUnivariateSpline(self.index, self.values,
+                                                            **self._interp_kwargs)
+        return Signal(self._interp_fnc(key), index=key if hasattr(key, '__len__') else [key])
 
     # _____________________________________________________________ #
     def window(self, index1=None, index2=None, is_positional=False, win_fcn='hann', fftbins=False):
@@ -267,12 +231,73 @@ class Signal(pd.Series):
             A list with elements of type :class:`Signal`. Each Signal element represents an
             extracted segment.
         """
-        peak_ind = peakutils.indexes(self.values, thres=thres, min_dist=int(pulse_width*self.Fs))
+        peak_ind = peakutils.indexes(self.values, thres=thres, min_dist=int(pulse_width * self.fs))
         wind_len = np.mean(np.diff(self.index[peak_ind]))
         parts = [self.window(index1=self.index[i]-wind_len/2.0,
                              index2=self.index[i]+wind_len/2.0,
                              win_fcn=win_fcn) for i in peak_ind]
         return parts
+
+    # _____________________________________________________________ #
+    def operate(self, option=''):
+        """
+        This is a convenience function for common operations on signals. Returns the signal
+        according to a given option.
+
+        Parameters
+        ----------
+        options (string, char) :
+            The possible options are (combined options are allowed)
+            +--------------------+--------------------------------------+
+            | *option*           | Meaning                              |
+            +====================+======================================+
+            | '' *(Default)*     | Return the raw signal                |
+            +--------------------+--------------------------------------+
+            | 'n'                | normalized signal by max amplitude   |
+            +--------------------+--------------------------------------+
+            | 'e'                | signal envelop                       |
+            +--------------------+--------------------------------------+
+            | 'd'                | decibel value                        |
+            +--------------------+--------------------------------------+
+        """
+        yout = self
+        if 'e' in option:
+            yout = np.abs(hilbert(yout))
+        if 'n' in option:
+            yout = yout/max(np.abs(yout))
+        if 'd' in option:
+            yout = 20*np.log10(np.abs(yout))
+        return Signal(yout, index=self.index)
+
+    # _____________________________________________________________ #
+    def fft(self, nfft=None, ssb=False):
+        """
+        Computes the Fast Fourier transform of the signal using :func:`scipy.fftpack.fft` function.
+        The Fourier transform of a time series function is defined as:
+
+        .. math::
+           \mathcal{F}(y) ~=~ \int_{-\infty}^{\infty} y(t) e^{-2 \pi j f t}\,dt
+
+        Parameters
+        ----------
+        nfft : int, optional
+            Specify the number of points for the FFT. The default is the length of
+            the time series signal.
+
+        ssb : boolean, optional
+            If true, returns only the single side band (components corresponding to positive
+            frequency).
+
+        Returns
+        -------
+         : Signal
+            The FFT of the signal.
+        """
+        if nfft is None:
+            nfft = self.size
+
+        uf = Signal(fftshift(fft(self, n=nfft)), index=fftshift(fftfreq(nfft, self.ts)))
+        return uf[uf.index >= 0] if ssb else uf
 
     # _____________________________________________________________ #
     def limits(self, threshold=-20):
@@ -295,7 +320,7 @@ class Signal(pd.Series):
         if threshold > 0:
             raise ValueError("threshold should be dB value <= 0, which is relative to the "
                              "normalized maximum amplitude.")
-        senv = self('end')
+        senv = self.operate('end')
         ind = np.where(senv >= threshold)[0]
         tout = []
         # make linear interpolation to get time value at threshold
@@ -352,17 +377,75 @@ class Signal(pd.Series):
             raise ValueError('method not supported. See documentation for supported methods.')
 
     # _____________________________________________________________ #
-    def stft(self, width, overlap=0, *args, **kwargs):
-        nperseg = int(width*self.Fs)
-        nol = int(overlap*self.Fs)
-        f, t, S = spectrogram(self.values, nperseg=nperseg, noverlap=nol, fs=self.Fs,
-                              mode='magnitude', *args, **kwargs)
-        return np.sum(S**2)
+    def spectrogram(self, width, overlap=0, **kwargs):
+        """
+        Computes the spectrogram (short-time Fourier transform) of the signal. This method uses
+        the function :func:`scipy.signal.spectrogram`.
+
+        Parameters
+        ----------
+        width : float
+            Substitute for the argument *nperseg* in the function :func:`scipy.signal.spectrogram`.
+            Here, *width* has same units as *index*.
+
+        overlap : float, optional
+            Substitute for the argument *noverlap* in the function :func:`scipy.signal.spectrogram`.
+            Here, *overlap was same units as *index*.
+
+        Returns
+        -------
+        : Signal2D
+            A Signal2D class representing the
+
+        Notes
+        -----
+        For other supported keyword arguments, see the documentation of
+        :func:`scipy.signal.spectrogram`. However, the two arguments *nperseg* and *noverlap*
+        should not be used.
+        """
+        nperseg = int(width * self.fs)
+        nol = int(overlap * self.fs)
+        f, t, S = spectrogram(self.values, fs=self.fs, nperseg=nperseg, noverlap=nol,
+                              mode='magnitude', **kwargs)
+        return Signal2D(S, index=f, columns=t)
 
     # _____________________________________________________________ #
-    def stcc(self, other, width, overlap=0, start=None, end=None, win_fcn='hann'):
+    def psd(self, width, overlap=0, **kwargs):
         """
-        Compute the short-time correlation coefficient of the signal.
+        Computes the periodogram of the signal. This method uses the function
+        :func:`scipy.signal.welch`.
+
+        Parameters
+        ----------
+        width : float
+            Substitute for the argument *nperseg* in the function :func:`scipy.signal.spectrogram`.
+            Here, *width* has same units as *index*.
+
+        overlap : float, optional
+            Substitute for the argument *noverlap* in the function :func:`scipy.signal.spectrogram`.
+            Here, *overlap was same units as *index*.
+
+        Returns
+        -------
+        : Signal2D
+            A Signal2D class representing the
+
+        Notes
+        -----
+        For other supported keyword arguments, see the documentation of
+        :func:`scipy.signal.welch`. However, the two arguments *nperseg* and *noverlap*
+        should not be used.
+        """
+        nperseg = int(width * self.fs)
+        nol = int(overlap * self.fs)
+        f, pxx = welch(self.values, fs=self.fs, nperseg=nperseg, noverlap=nol, **kwargs)
+        return Signal(pxx, index=f)
+
+    # _____________________________________________________________ #
+    def coherence(self, other, width, overlap=0, **kwargs):
+        """
+        Compute the short-time correlation coefficient of the signal. Uses the function
+        :func:`scipy.signal.coherence` for this computation.
 
         Parameters
         ----------
@@ -376,102 +459,57 @@ class Signal(pd.Series):
         overlap : float, optional
             Units (index units) of overlap between consecutive computations.
 
-        start : float
-            Start index for which to compute the STCC.
-
-        end : float
-            End index for which to compute the STCC.
-
-        win_fcn : string, array_like
-            The window type applied to each computation. See :func:`scipy.signal.get_window()`
-            for a complete list of available windows, and how to pass extra parameters for a
-            specific window type, if needed.
-
         Returns
         -------
         : array_like
             The computed short tiem cross-correlation function.
         """
-        y1 = self.reshape(self.ts, start=start, end=end)
-        y2 = other.reshape(self.ts, start=start, end=end)
-        if start is None:
-            start = y1.index[0]
-
-        ind1, ind2 = start, start+width
-        tau, tc = [], []
-        while ind2 <= y1.index[-1]:
-            c = fftconvolve(y1.window(index1=ind1, index2=ind2, win_fcn=win_fcn)(),
-                            y2.window(index1=ind1, index2=ind2, win_fcn=win_fcn)()[::-1],
-                            mode='full')
-            #tau.append((y1.size - np.argmax(c))*self.Ts)
-            #tc.append((ind1+ind2)/2.0)
-            tc.append(np.max(c))
-            ind1 += width-overlap
-            ind2 += width-overlap
-        return tc
+        other = other(self.index)
+        nperseg = int(width * self.fs)
+        nol = int(overlap * self.fs)
+        f, cxy = coherence(self.values, other.values, self.fs, nperseg=nperseg, noverlap=nol,
+                           **kwargs)
+        return Signal(cxy, index=f)
 
     # _____________________________________________________________ #
-    def align(self, other, ext=1):
-        """
-        Aligns the Series to the indexbase of another given Series.
-
-        Parameters
-        ----------
-        other : Signal
-            Another Signal whose indexbase will be used as reference.
-
-        ext : int, optional
-            Controls the extrapolation mode if new indexbase is larger
-            than current indexbase. Default is to return zeros.
-            See the Scipy documentation for more information.
-
-        Returns
-        -------
-        Signal : Signal
-            The signal with the new time base.
-        """
-        return self.interp(other.index, ext=ext)
-
-    # _____________________________________________________________ #
-    def filter(self, cutoff, option='lp', win_fcn='boxcar'):
+    def filter_freq(self, cutoff, option='lp', win_fcn='boxcar'):
         """
         Applies a frequency domain filter to the signal.
 
-        Parameters:
-            cutoff (float or (2,) array_like) :
-                 The cuttoff frequency (Hz) of the filter.
-                 This is a scalar value if type  is ``'lp'`` or ``'hp'``.
-                 When type is ``'bp'``, cutoff  should be a 2 element
-                 list, where the first element specifies the lower
-                 cutoff frequency, and the second element specifies
-                 the upper cutoff frequency.
+        Parameters
+        ----------
+        cutoff : float or (2,) tuple
+            The cuttoff frequency (Hz) of the filter. This is a scalar value if type
+            is ``'lp'`` or ``'hp'``. When type is ``'bp'``, cutoff  should be a 2 element list,
+            where the first element specifies the lower cutoff frequency, and the second element
+            specifies the upper cutoff frequency.
 
-            option (string, optional) :
-                The type of filter to be used.
+        option : string, optional
+            The type of filter to be used.
 
-                +--------------------+-----------------------------------------+
-                | *option*           | Meaning                                 |
-                +====================+=========================================+
-                | 'lp' *(Default)*   | Low-pass filter                         |
-                +--------------------+-----------------------------------------+
-                | 'hp'               | High-pass filter                        |
-                +--------------------+-----------------------------------------+
-                | 'bp'               | Band-pass filter                        |
-                +--------------------+-----------------------------------------+
+            +--------------------+-----------------------------------------+
+            | *option*           | Meaning                                 |
+            +====================+=========================================+
+            | 'lp' *(Default)*   | Low-pass filter                         |
+            +--------------------+-----------------------------------------+
+            | 'hp'               | High-pass filter                        |
+            +--------------------+-----------------------------------------+
+            | 'bp'               | Band-pass filter                        |
+            +--------------------+-----------------------------------------+
 
-            win_fcn (string) :
-                Apply a specific window in the frequency domain. See the function
-                :func:`scipy.signal.get_window` for a complete list of
-                available windows, and how to pass extra parameters for a
-                specific window function.
+        win_fcn : string, optional
+            Apply a specific window in the frequency domain. See the function
+            :func:`scipy.signal.get_window` for a complete list of available windows, and how to
+            pass extra parameters for a specific window function.
 
-        Returns:
-            Signal :
-                The filter Signal signal.
+        Returns
+        -------
+        : Signal
+            The filtered Signal.
         """
         fdomain = self.fft()
         index1 = 0
-        index2 = self.Fs/2.0
+        index2 = self.fs / 2.0
         if option == 'lp':
             index2 = cutoff
         elif option == 'hp':
@@ -486,95 +524,110 @@ class Signal(pd.Series):
         return Signal(np.real(ifft(fftshift(fdomain))), index=self.index)
 
     # _____________________________________________________________ #
-    def center_frequency(self, threshold=-6):
+    def center_frequency(self, threshold=-6, nfft=None):
         """
-        Computes the center frequency of the signal, which is the mean of the bandwidth
-        limits.
+        Computes the center frequency of the signal, which is the mean of the bandwidth limits.
 
-        Parameters:
-            threshold (float, optional) :
-                Threshold value in dB, indicating the noise floor level.
-                This value should be negative, as the specturm is normalized by
-                its maximum values, and thus the maximum amplitude is 0 dB. Default is -6 dB.
+        Parameters
+        ----------
+        threshold : float, optional
+            Threshold value in dB, indicating the noise floor level. This value should be
+            negative, as the specturm is normalized by its maximum values, and thus the maximum
+            amplitude is 0 dB. Default is -6 dB.
 
-        Returns:
-          float:
-              The value of the center frequency in Hz.
+        nfft : bool, optional
+            Since this computation is based on the Fourier transform, indicate the number of
+            points to be used on computing the FFT.
+
+        Returns
+        -------
+        : float
+            The value of the center frequency in Hz.
         """
         if threshold > 0:
             raise ValueError("threshold should be dB value <= 0.")
-        fdomain = self.fft(ssb=True)
-        Yn = fdomain('nd')
-        frequencies = Yn[Yn >= threshold].index
+        fdomain = self.fft(ssb=True, nfft=nfft)
+        yn = fdomain.operate('nd')
+        frequencies = yn[yn >= threshold].index
         return (frequencies.max() + frequencies.min())/2
 
     # _____________________________________________________________ #
-    def peak_frequency(self, threshold=-6):
+    def peak_frequency(self, threshold=-6, nfft=None):
         """
         Computes the peak frequency of the signal.
 
-        Parameters:
-            threshold (float, optional) :
-                Threshold value in dB, indicating the noise floor level.
-                This value should be negative, as the specturm is normalized by
-                its maximum values, and thus the maximum amplitude is 0 dB. Default is -6 dB.
+        Parameters
+        ----------
+        threshold : float, optional
+            Threshold value in dB, indicating the noise floor level. This value should be
+            negative, as the spectrum is normalized by its maximum values, and thus the maximum
+            amplitude is 0 dB. Default is -6 dB.
 
-        Returns:
-          float: The value of the center frequency in Hz.
+        nfft : bool, optional
+            Since this computation is based on the Fourier transform, indicate the number of
+            points to be used on computing the FFT.
+
+        Returns
+        -------
+        : float
+            The value of the center frequency in Hz.
         """
         if threshold > 0:
             raise ValueError("threshold should be dB value <= 0.")
-        return self.fft(ssb=True).idxmax()
+        return self.fft(ssb=True, nfft=nfft).idxmax()
 
     # _____________________________________________________________ #
-    def bandwidth(self, threshold=-6):
+    def bandwidth(self, threshold=-6, nfft=None):
         """
         Computes the bandwidth of the signal by finding the range of frequencies
         where the signal is above a given threshold.
 
-        Parameters:
-            threshold (float, optional) :
-                Units is decibel (dB) <= 0. The spectrum is normalized by its
-                maximum value, and thus the maximum amplitude is 0 dB. Default is -6 dB.
+        Parameters
+        ----------
+        threshold : float, optional
+            Units is decibel (dB) <= 0. The spectrum is normalized by its maximum value,
+            and thus the maximum amplitude is 0 dB. Default is -6 dB.
 
-        Returns:
-          float :
-              The total signal bandwidth.
+        nfft : bool, optional
+            Since this computation is based on the Fourier transform, indicate the number of
+            points to be used on computing the FFT.
+
+        Returns
+        -------
+        : float
+            The total signal bandwidth.
         """
         if threshold > 0:
             raise ValueError("threshold should be dB value <= 0.")
 
-        fdomain = self.fft(ssb=True)
-        Yn = fdomain('nd')
-        frequencies = Yn[Yn >= threshold].index
-        return frequencies.max() - frequencies.min()
+        fdomain = self.fft(ssb=True, nfft=nfft)
+        Yn = fdomain.operate('nd')
+        lims = Yn.limits(threshold)
+        return lims[1] - lims[0]
 
     # _____________________________________________________________ #
-    def max(self, option='peak', frequency=None):
+    def max(self, option='peak'):
         """
         Computes the maximum of the signal according to a given method.
 
-        Paramaters:
-            option (str, optional) :
-                The method to be used to compute the maximum. Supported options are:
+        Parameters
+        ----------
+        option : str, optional
+            The method to be used to compute the maximum. Supported options are:
 
-                ==================    ======================================
-                *option*               Meaning
-                ==================    ======================================
-                abs                   Max of the signal absolute value
-                env                   Max of the signal envelop
-                peak *(Default)*      Max of the raw signal
-                fft                   Max of the signal FFT magnitude
-                ==================    ======================================
+            ==================    ======================================
+            *option*               Meaning
+            ==================    ======================================
+            abs                   Max of the signal absolute value
+            env                   Max of the signal envelop
+            peak *(Default)*      Max of the raw signal
+            fft                   Max of the signal FFT magnitude
+            ==================    ======================================
 
-            frequency (float, optional) :
-                Used only when *option* is '*ftt*. This specifies
-                at what frequency to find the FFT value. If *None*, then the maximum
-                value of the fft is returned.
-
-        Returns:
-          float :
-              The maximum value of the specified signal form.
+        Returns
+        -------
+        : float
+            The maximum value of the specified signal form.
         """
         if option == 'peak':
             y = self
@@ -583,10 +636,8 @@ class Signal(pd.Series):
         elif option == 'env':
             y = self('e')
         elif option == 'fft':
-            F = self.fft(ssb=True)
-            y = F.abs()/F.size
-            if frequency is not None:
-                return F.abs().interp(frequency)
+            yf = self.fft(ssb=True)
+            y = yf.abs()/yf.size
         else:
             raise ValueError("The value for option is unknown. Should be: 'abs',"
                              "'env', 'peak', or 'fft'.")
@@ -595,18 +646,25 @@ class Signal(pd.Series):
     # _____________________________________________________________ #
     def energy(self, option='abs'):
         """
-        Computes the energy of the given waveform in the specified domain.
+        Computes the energy of the given waveform in the specified domain. Simpson's integration
+        is used for computing the total energy.
 
-        Paramaters:
-            option (str, optional):
-                The method to be used to compute the energy. Supported options are:
+        Parameters
+        ----------
+        option : str, optional
+            The method to be used to compute the energy. Supported options are:
 
-                =================    ======================================
-                *option*               Meaning
-                =================    ======================================
-                abs                  Use the absolute value of the signal
-                env                  Use the envelop of the signal
-                =================    ======================================
+            =================    ======================================
+            *option*               Meaning
+            =================    ======================================
+            abs                  Use the absolute value of the signal
+            env                  Use the envelop of the signal
+            =================    ======================================
+
+        Returns
+        -------
+        : float
+            The computes energy in the signal.
         """
         if option == 'abs':
             return simps(self.values**2, x=self.index)
@@ -620,9 +678,10 @@ class Signal(pd.Series):
         """
         Subtracts the mean of the signal.
 
-        Returns:
-            Signal:
-                The :class:`Signal` with its mean subtracted.
+        Returns
+        -------
+        : Signal
+            The :class:`Signal` with its mean subtracted.
         """
         return self - self.mean()
 
@@ -640,7 +699,7 @@ class Signal(pd.Series):
 
     # _____________________________________________________________ #
     @property
-    def Fs(self):
+    def fs(self):
         """ Get the signal sampling frequency. """
         return 1.0/self.ts
 

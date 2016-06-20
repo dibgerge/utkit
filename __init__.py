@@ -7,10 +7,10 @@
     :toctree: generated/
 
     Signal
-    Scan2D
-    Scan3D
+    Signal2D
+    Signal3D
 """
 from .signal import *
-from .scan2d import *
-from .scan3d import *
+from .signal2d import *
+from .signal3d import *
 from .peakutils import *

@@ -1,10 +1,9 @@
 import pandas as pd
 import numpy as np
-from . import Scan2D
 from pandas.tools.util import cartesian_product
 
-# _______________________________________________________________________#
-class Scan3D(pd.Panel):
+
+class Signal3D(pd.Panel):
     """
     Represents data from a raster scan. Each point is represented by its 2-D coordnates
     (X, Y), and contains a time series signal with time base t.
@@ -13,13 +12,20 @@ class Scan3D(pd.Panel):
         * **axis 0 (items)**: *Y*-direction representing scan index,
         * **axis 1 (major_axis)**: time base *t* for each time series,
         * **axis 2 (minor_axis)**: *X*-direction representing scan position.
+
+    .. autosummary::
+
+        shift_axis
     """
 
     @property
     def _constructor(self):
-        return Scan3D
+        return Signal3D
 
-    _constructor_sliced = Scan2D
+    @property
+    def _constructor_sliced(self):
+        from .signal2d import Signal2D
+        return Signal2D
 
     # _____________________________________________________________ #
     def shift_axis(self, shift, axis=None):
@@ -36,7 +42,7 @@ class Scan3D(pd.Panel):
                 If None shift all axes.
 
         Returns:
-            Scan2D: A copy of Scan2D with shiftes axes.
+            Signal2D: A copy of Scan2D with shiftes axes.
         """
         ynew = self.copy()
         if axis is None:
@@ -68,7 +74,7 @@ class Scan3D(pd.Panel):
                 If None scale all axes.
 
         Returns:
-            Scan2D :
+            Signal2D :
                 A copy of Scan2D with scaled axes.
         """
         ynew = self.copy()
@@ -97,7 +103,7 @@ class Scan3D(pd.Panel):
                 Select which slice to be used for the b-scan. If 'max', the
                 slice passing through the maximum point is selected.
         Returns :
-            Scan2D :
+            Signal2D :
                 A Scan2D object representing the B-scan.
         """
         if depth == 'max':
@@ -121,7 +127,7 @@ class Scan3D(pd.Panel):
                 Select which slice to be used for the b-scan. If 'max', the
                 slice passing through the maximum point is selectd.
         Returns:
-            Scan2D :
+            Signal2D :
                 A Scan2D object representing the D-scan.
         """
         if depth == 'max':
@@ -161,7 +167,7 @@ class Scan3D(pd.Panel):
                 before projecting the T-axis onto the X-axis.
 
         Returns:
-            Scan2D :
+            Signal2D :
                 A Scan2D object representing the C-scan.
         """
         if depth == 'project':
@@ -191,7 +197,7 @@ class Scan3D(pd.Panel):
 
         Returns:
             Y, T, X, values (tuple):
-                A 4-element tuple where each element is a flattened array of the Scan3D,
+                A 4-element tuple where each element is a flattened array of the Signal3D,
                 and each representing a point with coordinates Y, T, X and its value.
         """
         yv, tv, xv = np.meshgrid(self.Y, self.t, self.X, indexing='xy')

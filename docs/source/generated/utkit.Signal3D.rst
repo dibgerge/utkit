@@ -1,6 +1,6 @@
-utkit.Scan3D
+utkit.Signal3D
 ============
 
 .. currentmodule:: utkit
 
-.. autoclass:: Scan3D
+.. autoclass:: Signal3D
