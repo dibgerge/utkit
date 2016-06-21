@@ -136,6 +136,7 @@ class Signal2D(pd.DataFrame):
             except TypeError:
                 shift = [shift, shift]
             return Signal2D(self.values, index=self.index-shift[0], columns=self.columns-shift[1])
+
         elif axis == 'Y' or axis == 0 or axis == 'index':
             return Signal2D(self.values, index=self.index-shift, columns=self.columns)
         elif axis == 'X' or axis == 1 or axis == 'columns':
@@ -184,17 +185,36 @@ class Signal2D(pd.DataFrame):
                     raise ValueError('scale should be either a scalar or 2 element array/tuple.')
             except TypeError:
                 scale = [scale, scale]
-        ynew = self.copy()
-        if axis is None:
-            ynew.index *= scale
-            ynew.columns *= scale
-        elif axis == 'Y' or axis == 0:
-            ynew.index *= scale
+            try:
+                if len(start) != 2:
+                    raise ValueError('start should be either a scalar or 2 element array/tuple.')
+            except TypeError:
+                start = [start, start]
+            try:
+                if len(end) != 2:
+                    raise ValueError('end should be either a scalar or 2 element array/tuple.')
+            except TypeError:
+                end = [end, end]
+
+            if start[0] >= end[0] or start[1] >= end[1]:
+                raise ValueError('start should be smaller than end.')
+
+            newindex, newcol = self.index, self.columns
+            newindex[newindex >= start[0] & newindex <= end[0]] *= scale[0]
+            newcol[newcol >= start[1] & newcol <= end[1]] *= scale[1]
+            return Signal2D(self.values, index=newindex, columns=newcol)
+
+        elif axis == 'Y' or axis == 0 or axis == 'index':
+            newindex = self.index
+            newindex[newindex >= start & newindex <= end] *= scale
+            return Signal2D(self.values, index=newindex, columns=self.columns)
+
         elif axis == 'X' or axis == 1:
-            ynew.colums *= scale
+            newcol = self.columns
+            newcol[newcol >= start & newcol <= end] *= scale
+            return Signal2D(self.values, index=self.index, columns=self.newcol)
         else:
             raise ValueError('Unknown axis value.')
-        return ynew
 
     # _____________________________________________________________ #
     def flip(self, axis):
