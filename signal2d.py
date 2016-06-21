@@ -1,14 +1,13 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import hilbert
-from scipy.interpolate import InterpolatedUnivariateSpline
 from .signal3d import Signal3D
 
 
 class Signal2D(pd.DataFrame):
     """
     Extends :class:`pandas.DataFrame` class to support operations commonly required
-    in ultrasonics. The axis convention used is:
+    in radio frequency signals, and especially in ultrasonics. The axis convention used is:
 
         * **Axis 1 (columns)**: *X*-direction
         * **Axis 0 (index)**: *Y*-direction
@@ -21,56 +20,88 @@ class Signal2D(pd.DataFrame):
     option of specifying only the sampling intervals along the *X* and *Y* directions.
     Thus, if *index* and/or *columns* are scalars, which *data* is a 2-D array, then
     the Signal2D basis are constructed starting from 0 at the given sampling intervals.
-
-    .. autosummary::
-
-        resample_axis
     """
-
     def __init__(self, data=None, index=None, columns=None, dtype=None, copy=False):
-        # Consider the case when index is scalar, then it is Ts
-        if not hasattr(index, '__len__') and hasattr(data, '__len__') and index is not None:
-            index = np.arange(data.shape[0])*index
+        if index is not None and data is not None:
+            if not hasattr(index, '__len__'):
+                if isinstance(data, dict):
+                    if hasattr(data[list(data.keys())[0]], '__len__'):
+                        datalen = len(data[list(data.keys())[0]])
+                    else:
+                        datalen = 0
+                elif hasattr(data, '__len__'):
+                    datalen = len(data)
+                else:
+                    datalen = 0
+                if datalen > 0:
+                    index = np.arange(datalen) * index
 
-        if not hasattr(columns, '__len__') and hasattr(data, '__len__') and index is not None:
-            columns = np.arange(data.shape[1])*columns
+        if columns is not None and data is not None:
+            if not hasattr(columns, '__len__'):
+                if isinstance(data, dict):
+                    datalen = len(data)
+                elif isinstance(data, pd.Series):
+                    datalen = 0
+                elif isinstance(data, pd.DataFrame):
+                    datalen = data.shape[1]
+                elif hasattr(data, '__len__'):
+                    datalen = len(data[0])
+                else:
+                    datalen = 0
+                if datalen > 0:
+                    columns = np.arange(datalen) * columns
+
         super().__init__(data=data, index=index, columns=columns, dtype=dtype, copy=copy)
-        self._fdomain = None
-        self._interp_fnc = None
-        self._interp_s = None
 
     @property
     def _constructor(self):
         return Signal2D
 
-    # _constructor_sliced = utkit.Signal
+    @property
+    def _constructor_sliced(self):
+        from .signal import Signal
+        return Signal
 
     @property
     def _constructor_expanddim(self):
         return Signal3D
 
     # _____________________________________________________________ #
-    def __call__(self, option=''):
+    def __call__(self, key0, key1, **kwargs):
+        pass
+
+    # _____________________________________________________________ #
+    def operate(self, option='', axis=0):
         """
         Returns the signal according to a given option.
 
-        Parameters:
-            options (string, char) :
-                The possible options are (combined options are allowed):
+        Parameters
+        ----------
+        option : string/char, optional
+            The possible options are (combined options are allowed):
 
-                 +--------------------+--------------------------------------+
-                 | *option*           | Meaning                              |
-                 +====================+======================================+
-                 | '' *(Default)*     | Return the raw signal                |
-                 +--------------------+--------------------------------------+
-                 | 'n'                | normalized signal                    |
-                 +--------------------+--------------------------------------+
-                 | 'd'                | decibel value                        |
-                 +--------------------+--------------------------------------+
+             +--------------------+--------------------------------------+
+             | *option*           | Meaning                              |
+             +====================+======================================+
+             | '' *(Default)*     | Return the raw signal                |
+             +--------------------+--------------------------------------+
+             | 'n'                | normalized signal                    |
+             +--------------------+--------------------------------------+
+             | 'd'                | decibel value                        |
+             +--------------------+--------------------------------------+
+
+        axis : int
+            Only used in the case option specified 'e' for envelop. Specifies along which axis to
+            compute the envelop.
+
+        Returns
+        -------
+        : Signal2D
+            The modified Signal2D.
         """
         yout = self
         if 'e' in option:
-            yout = np.abs(hilbert(yout, axis=0))
+            yout = np.abs(hilbert(yout, axis=axis))
         if 'n' in option:
             yout = yout/np.abs(yout).max().max()
         if 'd' in option:
@@ -78,190 +109,81 @@ class Signal2D(pd.DataFrame):
         return Signal2D(yout, index=self.index, columns=self.columns)
 
     # _____________________________________________________________ #
-    def resample_axis(self, start=None, end=None, step=None, axis=0, fill='min'):
-        """
-        Resamples Frame along a given axis. Currently only downsampling at integer multiples of
-        current sampling rate is supported (to make this method fast).
-        If upsampling, or non-integer multiples of sampling frequency are required, consider using
-        interpolation functions.
-
-        Parameters:
-            start (float, optional) :
-                The start index along the given axis. Default is the minimum index of the axis.
-
-            end (float, optional):
-                The end index along the given axis. Default is the maximum index of the axis.
-
-            step (float, optional):
-                The sampling step size. If this step size is smaller than current sampling step
-                size, it will be defaulted to current step size. If step is not a multiple of
-                current sampling step size, it will be rounded to the nearest multiple. Defaults to
-                current step size if not specified.
-
-            axis (int, optional):
-                The axis to resample, take values of 0 (index/Y-axis) or 1 (columns/X-axis).
-
-            fill (string/float, optional):
-                Value used to fill the uFrame if padding is required. Supported options:
-
-                 +--------------------+--------------------------------------+
-                 | *fill*             | Meaning                              |
-                 +====================+======================================+
-                 | 'min' *(Default)*  | Minimum value in current uFrame      |
-                 +--------------------+--------------------------------------+
-                 | 'max'              | Maximum value in current uFrame      |
-                 +--------------------+--------------------------------------+
-                 | 'mean'             | Mean value of the uFrame             |
-                 +--------------------+--------------------------------------+
-                 | (float)            | A custom scalar                      |
-                 +--------------------+--------------------------------------+
-
-        Returns:
-            Signal2D:
-                A new uFrame with its axis resampled.
-        """
-        if fill == 'min':
-            fill = self.min().min()
-        elif fill == 'max':
-            fill = self.max().max()
-        elif fill == 'mean':
-            fill = self.mean().mean()
-
-        if start is None and end is None and step is None:
-            return self
-        if start is None:
-            start = self.axes[axis].min()
-        if end is None:
-            end = self.axes[axis].max()
-        if step is None:
-            step = 1
-        else:
-            step = int(np.around(step/self.Xs[axis]))
-            if step == 0:
-                step = 1
-
-        # resample the original array
-        ynew = self
-        if axis == 1:
-            ynew = self.loc[:, start:end:step]
-        elif axis == 0:
-            ynew = self.loc[start:end:step, :]
-        else:
-            raise ValueError('Unknown axis value.')
-
-        new_axis = ynew.axes[axis].values
-
-        # pad the start of the dataframe if needed
-        npad_start = int((ynew.axes[axis].min() - start)/ynew.Xs[axis])
-        if npad_start > 0:
-            start = ynew.axes[axis].min() - npad_start*ynew.Xs[axis]
-            new_axis = np.concatenate((np.arange(npad_start)*ynew.Xs[axis] + start, new_axis))
-
-        # pad the end of the dataframe if needed
-        npad_end = int((end - ynew.axes[axis].max())/ynew.Xs[axis])
-        if npad_end > 0:
-            end = ynew.axes[axis].max() + ynew.Xs[axis]
-            new_axis = np.concatenate((new_axis, np.arange(npad_end)*ynew.Xs[axis] + end))
-
-        # construct the new dataframe with the new axis
-        if axis == 0:
-            out = Signal2D(fill, index=new_axis, columns=ynew.columns)
-        elif axis == 1:
-            out = Signal2D(fill, index=ynew.index, columns=new_axis)
-        out.loc[ynew.index.values, ynew.columns.values] = ynew.values
-        return out
-
-    # _____________________________________________________________ #
-    def resample(self, xstart=None, ystart=None, xend=None, yend=None,
-                 xstep=None, ystep=None, fill='min'):
-        """
-        Resamples the uFrame along both the X-Axis and Y-Axis. Uses the method resample_axis for
-        fulfilling this purpose. Currently only downsampling is supported. See docs of
-        resample_axis for more information.
-
-        Parameters:
-            xstart (float, optional):
-                The X-axis (axis 1/columns) start. Default is the minimum of current X-axis.
-
-            ystart (float, optional):
-                The Y-axis (axis 0/index) start. Default is the minimum of current Y-axis.
-
-            xend (float, optional):
-                The X-axis (axis 1/columns) end. Default is the maximum of current X-axis.
-
-            yend (float, optional):
-                The Y-axis (axis 0/index) end. Default is the maximum of current Y-axis.
-
-            xstep (float, optional):
-                The X-axis sampling step size. See resample_axis for more information.
-
-            ystep (float, optional):
-                The Y-axis sampling step size. See resample_axis for more information.
-
-            fill (string/float, optional):
-                Value used to fill the uFrame if padding is required. See resample_axis for more
-                information.
-
-        Returns:
-            Signal2D:
-                A new uFrame with its axes resampled.
-        """
-        # these are not needed (duplicated from resample_axis), but they can make execution faster
-        if fill == 'min':
-            fill = self.min().min()
-        elif fill == 'max':
-            fill = self.max().max()
-        elif fill == 'mean':
-            fill = self.mean().mean()
-
-        df = self.resample_axis(start=xstart, end=xend, step=xstep, axis=1, fill=fill)
-        df = df.resample_axis(start=ystart, end=yend, step=ystep, axis=0, fill=fill)
-        return df
-
-    # _____________________________________________________________ #
     def shift_axis(self, shift, axis=None):
         """
-        Applies shifting of a given axis.
+        Shifts an axis (or both axis) by a specified amount.
 
-        Parameters:
-            shift (float):
-                The amount to shift the axis.
+        Parameters
+        ----------
+        shift : float, array_like
+            The amount to shift the axis. If axis is specified, *shift* should be scalar. If no
+            axis specified *shift* can be a scalar (shift both axes by the same amount),
+            or a 2-element vector for a different shift value for each axis.
 
-            axis (int/string, optional):
-                If 0 or 'Y', shift the index, if 1 or 'X', shift the columns. If None shift both.
+        axis : int/string, optional
+            If 0  or 'Y' or 'index', shift the index, if 1 or 'X' or 'columns', shift the
+            columns. If None shift both.
 
-        Returns:
-            Signal2D:
-                A copy of uFrame with shiftes axes.
+        Returns
+        -------
+        Signal2D:
+            A new Signal2D with shifted axes.
         """
-        ynew = self.copy()
         if axis is None:
-            ynew.index -= shift[1]
-            ynew.columns -= shift[0]
+            try:
+                if len(shift) != 2:
+                    raise ValueError('shift should be either a scalar or 2 element array/tuple.')
+            except TypeError:
+                shift = [shift, shift]
+            return Signal2D(self.values, index=self.index-shift[0], columns=self.columns-shift[1])
         elif axis == 'Y' or axis == 0 or axis == 'index':
-            ynew.index -= shift
+            return Signal2D(self.values, index=self.index-shift, columns=self.columns)
         elif axis == 'X' or axis == 1 or axis == 'columns':
-            ynew.columns -= shift
+            return Signal2D(self.values, index=self.index, columns=self.columns-shift)
         else:
-            raise ValueError('Unknwon axis value.')
-        return ynew
+            raise ValueError('Unknown axis value given. See documentation for allowed axis values.')
 
     # _____________________________________________________________ #
-    def scale_axis(self, scale, axis=None):
+    def scale_axis(self, scale, start=None, end=None, axis=None):
         """
-        Applies scaling of a given axis.
+        Scales a given axis (or both) by a given amount.
 
-        Parameters:
-            scale (float) :
-                The amount to scale the axis.
+        Parameters
+        ----------
+        scale : float, array_like
+            The amount to scale the axis. If axis is specified,
+            *scale* should be scalar. If no axis specified *scale* can be a scalar (scale both
+            axes by the same amount), or a 2-element vector for a different scale value for each
+            axis.
 
-            axis (int/string, optional):
-                If 0 or 'Y', scale the index, if 1 or 'X', scale the columns. If None scale both.
+        start : float, optional
+            The axis value at which to start applying the scaling. If not
+            specified, the whole axis will be scaled starting from the first axis value. If
+            *axis* is specified, *start* should be a scalar, otherwise, *start* can be either a
+            scalar (scale both axes by the same factor), or a 2-element array for scaling each
+            axis differently.
 
-        Returns:
-            Signal2D:
-                A copy of uFrame with scaled axes.
+        end : float, optional
+            The axis value at which to end the scaling. If not specified, the axis will be
+            scaled up to the last axis value. If *axis* is specified, *end* should be a
+            scalar, otherwise, *end* can be either a scalar (scale both axes by the same
+            factor), or a 2-element array for scaling each axis differently.
+
+        axis : int/string, optional
+            If 0, 'Y' or index, scale the index, if 1, 'X' or 'columns', scale the columns. If None
+            scale both axes.
+
+        Returns
+        -------
+        : Signal2D
+            A copy of Signal2D with scaled axes.
         """
+        if axis is None:
+            try:
+                if len(scale) != 2:
+                    raise ValueError('scale should be either a scalar or 2 element array/tuple.')
+            except TypeError:
+                scale = [scale, scale]
         ynew = self.copy()
         if axis is None:
             ynew.index *= scale

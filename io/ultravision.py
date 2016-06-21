@@ -10,12 +10,15 @@ def ultravision(fname):
     """
     Reads ultrasound scans saved in UltraVision (ZETEC, Inc. software) text file format.
 
-    :param
-        fname: file name
-        Fs: Sampling frequency (Hz)
+    Parameters
+    ----------
+    fname : string
+        The full path or relative path to the file.
 
-
-    :return:
+    Returns
+    -------
+    : utkit.Signal3D
+        :class:`utkit.Signal3D` object representing a scan.
     """
     header = pd.read_table(fname, sep=' =\t', skipinitialspace=True, header=None, nrows=19,
                            engine='python', index_col=0, squeeze=True)

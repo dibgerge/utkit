@@ -40,14 +40,12 @@ class Signal(pd.Series):
     The class :class:`Signal` provides various methods for signal reshaping, transforms,
     and feature extraction.
     """
-    def __init__(self, data=None, index=None, ts=None, *args, **kwargs):
-
-        # Consider the case when index is scalar, then it is ts
-        if ts is not None and index is not None:
-            raise NotImplementedError('Cannot specify both ts and index for the time being.')
-
-        if ts is not None:
-            index = np.arange(len(data))*ts
+    def __init__(self, data=None, index=None, *args, **kwargs):
+        if index is not None and data is not None:
+            if not hasattr(index, '__len__') and hasattr(data, '__len__'):
+                index = np.arange(len(data)) * index
+            elif not hasattr(index, '__len__') and not hasattr(data, '__len__'):
+                index = [index]
 
         super().__init__(data, index, *args, **kwargs)
         if not self.index.is_monotonic_increasing:
@@ -95,14 +93,14 @@ class Signal(pd.Series):
            If *key* is a sequence, a new :class:`Signal` with its time base
            given by *key* is returned.
 
-        Notes
-        -----
+        Note
+        ----
         This method take additional optional keyword arguments that are passed to the interpolant
         function. To see a description of supported arguments, refer to the documentation of
         :class:`scipy.interpolate.InterpolatedUnivariateSpline`.
 
-        Notes
-        -----
+        Note
+        ----
         One difference in default values for the argument is that the extrapolation mode is set
         to 'zeros', instead of 'extrapolate'. This is based on the assumption that the signal
         goes to zero outside of its sampled range.
@@ -158,7 +156,8 @@ class Signal(pd.Series):
         Signal:
             The windowed Signal signal.
 
-        .. note::
+        Note
+        ----
           If the window requires no parameters, then `win_fcn` can be a string.
           If the window requires parameters, then `win_fcn` must be a tuple
           with the first argument the string name of the window, and the next
@@ -167,11 +166,16 @@ class Signal(pd.Series):
         """
         wind = Signal(0, index=self.index)
         if is_positional:
-            index1 = wind.index[index1]
-            index2 = wind.index[index2]
+            if isinstance(index1, float) or isinstance(index2, float):
+                raise ValueError('Indices are floats, are you sure you want positional indices?')
+            index1 = wind.index.values[index1]
+            index2 = wind.index.values[index2]
 
         wind[index1:index2] = get_window(win_fcn, len(wind[index1:index2]))
         if fftbins:
+            if wind[-index2:-index1].size == 0:
+                raise IndexError('The signal does not have values at the negative of the indices '
+                                 'supplied. Disable fftbins for one-sided windowing.')
             wind[-index2:-index1] = get_window(win_fcn, len(wind[-index2:-index1]))
         return self*wind
 
@@ -185,9 +189,10 @@ class Signal(pd.Series):
         option: string, optional
             Method to be used to normalize the signal. The possible options are:
 
-            - 'max' *(Default)* : Divide by the maximum of the signal, so that the normalized
-            maximum has an amplitude of 1.
-            - 'energy': Divide by the signal energy.
+                * *'max' (Default)* : Divide by the maximum of the signal, so that the normalized
+                  maximum has an amplitude of 1.
+
+                * *'energy'*: Divide by the signal energy.
 
         Returns
         -------
@@ -333,8 +338,8 @@ class Signal(pd.Series):
     # _____________________________________________________________ #
     def tof(self, method='corr', *args):
         """
-        Computes the time of flight relative to another signal. Currently only cross-correlation
-        type of time of flight computation is supported.
+        Computes the time of flight relative to another signal. Three different methods for
+        computing the time of flight are currently supported.
 
         Parameters
         ----------
@@ -342,14 +347,16 @@ class Signal(pd.Series):
             The method to be used for computing the signal time of flight. The following methods
             are currently supported:
 
-            - corr : Use a correlation peak to compute the time of flight relative to another
-            signal. Another signal should be provided as input for performing the correlation.
-            - max : The maximum value of the signal is used to compute the time of flight. This
-            time of flight is relative to the signal's time 0.
-            - thresh : Compute the time the signal first crosses a given threshold value. The
-            threshold should  be given as argument in dB units. Note that the signal is
-            normalized by it's maximum for the purpose of finding the threshold crossing,
-            thus the maximum dB value is 0. If no threshold is given, the default is -12 dB.
+                * *corr* : Use a correlation peak to compute the time of flight relative to another
+                  signal. Another signal should be provided as input for performing the correlation.
+
+                * *max* : The maximum value of the signal is used to compute the time of flight.
+                  This time of flight is relative to the signal's time 0.
+
+                * *thresh* : Compute the time the signal first crosses a given threshold value. The
+                  threshold should  be given as argument in dB units. Note that the signal is
+                  normalized by it's maximum for the purpose of finding the threshold crossing,
+                  thus the maximum dB value is 0. If no threshold is given, the default is -12 dB.
 
         Returns
         -------
@@ -397,8 +404,8 @@ class Signal(pd.Series):
         : Signal2D
             A Signal2D class representing the
 
-        Notes
-        -----
+        Note
+        ----
         For other supported keyword arguments, see the documentation of
         :func:`scipy.signal.spectrogram`. However, the two arguments *nperseg* and *noverlap*
         should not be used.
@@ -430,8 +437,8 @@ class Signal(pd.Series):
         : Signal2D
             A Signal2D class representing the
 
-        Notes
-        -----
+        Note
+        ----
         For other supported keyword arguments, see the documentation of
         :func:`scipy.signal.welch`. However, the two arguments *nperseg* and *noverlap*
         should not be used.
@@ -606,7 +613,7 @@ class Signal(pd.Series):
         return lims[1] - lims[0]
 
     # _____________________________________________________________ #
-    def max(self, option='peak'):
+    def maxof(self, option='peak'):
         """
         Computes the maximum of the signal according to a given method.
 
@@ -693,8 +700,8 @@ class Signal(pd.Series):
 
     # _____________________________________________________________ #
     @property
-    def range(self):
-        """ Get the signal sampling period. """
+    def extent(self):
+        """ Get the signal index extent. """
         return self.index.max() - self.index.min()
 
     # _____________________________________________________________ #

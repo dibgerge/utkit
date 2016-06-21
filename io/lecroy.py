@@ -7,49 +7,50 @@ def lecroy(filename):
     """
     Reads binary waveform file (.trc) saved from LeCroy Waverunner Oscilloscope.
 
+    Parameters
+    ----------
+    filename : string
+        The LeCroy binary file to be loaded. The full path or absolute path must be given.
+
+    Returns
+    -------
+    wave : Dict
+        A dictionary `wave` with three keys is returned:
+        wave['x'] is the horizontal axis of the data acquistion
+        wave['y'] is the vertical axis of the data aquisition
+        wave['info'] is itself a dictionary containing information
+        about the data acquisiton. The keys for wave info are:
+
+        ===============   =============================================================
+        Key               Description
+        ===============   =============================================================
+        instrument_name   Name of the oscilloscope
+        instrument_name   Unique serial number of oscilloscope
+        filename          The loaded file name
+        trigger_time      A datetime object for trigger time with microsecond accuracy
+        channel           Channel number
+        coupling          Channel coupling possible values are: DC_50ohms,
+                          Ground, DC_10Mohm, AC_1Mohm
+        bandwidth_limit   Boolean indicating if bandwidth limit was used on the channel
+        record type       Possible values: single_sweep, interleaved, histogram, graph
+                          filter_coefficient, complex, extrema,
+                          sequence_obsolete, contered_RIS, peak_detect
+        processing        Type of processing done on the waveform:
+                          no_processing, fir_filter, interpolated,
+                          sparsed, autoscaled, no_result, rolling, cumulative
+        nominal_bits      Number of bits for oscilloscope
+        gain_with_probe   Gain in volts/div
+        timebase          seconds/div
+        Fs                Sampling frequency (samples/second)
+        Ts                Sampling time (seconds/sample)
+        ===============   =============================================================
+
+    References
+    ----------
     This function is based on the Matlab file ReadLeCroyBinaryWaveform.m
     by Jean-Daniel Deschenes,and also it is an adaptation (fixing multiple
     bugs), from the file website
     http://qtwork.tudelft.nl/gitdata/users/guen/qtlabanalysis/analysis_modules/general/lecroy.py
-
-    Parameter:
-        filename (string) :
-          The Lecroy binary file to be loaded. The full path or absolute path
-          must be given.
-    Returns:
-        wave (Dict) :
-          A dictionary `wave` with three keys is returned:
-          wave['x'] is the horizontal axis of the data acquistion
-          wave['y'] is the vertical axis of the data aquisition
-          wave['info'] is itself a dictionary containing information
-          about the data acquisiton. The keys for wave info are:
-
-          ===============   ======================================================
-          Key               Description
-          ===============   ======================================================
-          instrument_name   Name of the oscilloscope
-          instrument_name   Unique serial number of oscilloscope
-          filename          The loaded file name
-          trigger_time      A datetime object for trigger time with
-                            microsecond accuracy
-          channel           Channel number
-          coupling          Channel coupling possible values are:
-                            DC_50ohms, Ground, DC_10Mohm, AC_1Mohm
-          bandwidth_limit   Boolean indicating if bandwidth limit was
-                            used on the channel
-          record type       Possible values:
-                            single_sweep, interleaved, histogram, graph
-                            filter_coefficient, complex, extrema,
-                            sequence_obsolete, contered_RIS, peak_detect
-          processing        Type of processing done on the waveform:
-                            no_processing, fir_filter, interpolated,
-                            sparsed, autoscaled, no_result, rolling, cumulative
-          nominal_bits      Number of bits for oscilloscope
-          gain_with_probe   Gain in volts/div
-          timebase          seconds/div
-          Fs                Sampling frequency (samples/second)
-          Ts                Sampling time (seconds/sample)
-          ===============   ======================================================
     """
 
     # Define an empty dictionary that will be used to store wave info
