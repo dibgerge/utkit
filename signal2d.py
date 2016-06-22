@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import hilbert
+from scipy.interpolate import griddata
+
 from .signal3d import Signal3D
 
 
@@ -20,6 +22,9 @@ class Signal2D(pd.DataFrame):
     option of specifying only the sampling intervals along the *X* and *Y* directions.
     Thus, if *index* and/or *columns* are scalars, which *data* is a 2-D array, then
     the Signal2D basis are constructed starting from 0 at the given sampling intervals.
+
+    If data input is a dictionary, usual rules from :class:`pandas.DataFrame` apply, but index
+    can still be a scalar specifying the sampling interval.
     """
     def __init__(self, data=None, index=None, columns=None, dtype=None, copy=False):
         if index is not None and data is not None:
@@ -39,7 +44,7 @@ class Signal2D(pd.DataFrame):
         if columns is not None and data is not None:
             if not hasattr(columns, '__len__'):
                 if isinstance(data, dict):
-                    datalen = len(data)
+                    datalen = 0
                 elif isinstance(data, pd.Series):
                     datalen = 0
                 elif isinstance(data, pd.DataFrame):
@@ -52,6 +57,11 @@ class Signal2D(pd.DataFrame):
                     columns = np.arange(datalen) * columns
 
         super().__init__(data=data, index=index, columns=columns, dtype=dtype, copy=copy)
+        # check for axes monotonicity
+        if not self.index.is_monotonic_increasing:
+            raise ValueError('Index must be monotonically increasing.')
+        if not self.columns.is_monotonic_increasing:
+            raise ValueError('Columns must be monotonically increasing.')
 
     @property
     def _constructor(self):
@@ -68,7 +78,14 @@ class Signal2D(pd.DataFrame):
 
     # _____________________________________________________________ #
     def __call__(self, key0, key1, **kwargs):
-        pass
+        """
+        Interpolate the axes
+
+        Parameters
+        ----------
+        """
+        return griddata((self.columns.values, self.index.values), self.values, (key1, key0),
+                        **kwargs)
 
     # _____________________________________________________________ #
     def operate(self, option='', axis=0):
@@ -90,7 +107,7 @@ class Signal2D(pd.DataFrame):
              | 'd'                | decibel value                        |
              +--------------------+--------------------------------------+
 
-        axis : int
+        axis : int, optional
             Only used in the case option specified 'e' for envelop. Specifies along which axis to
             compute the envelop.
 
@@ -107,6 +124,38 @@ class Signal2D(pd.DataFrame):
         if 'd' in option:
             yout = 20*np.log10(np.abs(yout))
         return Signal2D(yout, index=self.index, columns=self.columns)
+
+    # _____________________________________________________________ #
+    @staticmethod
+    def _verify_scalar_or2(val, assign=None):
+        """
+        Verifies that the value is either a scalar, or a two element vector. If it is a scalar,
+        makes it a two element vector of same element values.
+
+        Parameters
+        ----------
+        val : float, array_like
+            The value to verify if it is a scalar or 2 element array.
+
+        assign : array_like, 2 elements
+            A two element array that assigns the value if *val* is None.
+
+        Returns
+        -------
+        The new computed value according to whether *val* was :const:`None`, scalar,
+        or two eleemnt array.
+        """
+        try:
+            if len(val) != 2:
+                raise ValueError('scale should be either a scalar or 2 element array/tuple.')
+        except TypeError:
+            if val is None and assign is None:
+                return None
+            elif val is None:
+                return assign
+            else:
+                return [val, val]
+        return val
 
     # _____________________________________________________________ #
     def shift_axis(self, shift, axis=None):
@@ -129,23 +178,22 @@ class Signal2D(pd.DataFrame):
         Signal2D:
             A new Signal2D with shifted axes.
         """
+        if isinstance(axis, str):
+            axis = axis.lower()
+
         if axis is None:
-            try:
-                if len(shift) != 2:
-                    raise ValueError('shift should be either a scalar or 2 element array/tuple.')
-            except TypeError:
-                shift = [shift, shift]
+            shift = self._verify_scalar_or2(shift)
             return Signal2D(self.values, index=self.index-shift[0], columns=self.columns-shift[1])
 
-        elif axis == 'Y' or axis == 0 or axis == 'index':
+        elif axis == 'y' or axis == 0 or axis == 'index':
             return Signal2D(self.values, index=self.index-shift, columns=self.columns)
-        elif axis == 'X' or axis == 1 or axis == 'columns':
+        elif axis == 'x' or axis == 1 or axis == 'columns':
             return Signal2D(self.values, index=self.index, columns=self.columns-shift)
         else:
             raise ValueError('Unknown axis value given. See documentation for allowed axis values.')
 
     # _____________________________________________________________ #
-    def scale_axis(self, scale, start=None, end=None, axis=None):
+    def scale_axis(self, scale, start=None, stop=None, axis=None):
         """
         Scales a given axis (or both) by a given amount.
 
@@ -164,7 +212,7 @@ class Signal2D(pd.DataFrame):
             scalar (scale both axes by the same factor), or a 2-element array for scaling each
             axis differently.
 
-        end : float, optional
+        stop : float, optional
             The axis value at which to end the scaling. If not specified, the axis will be
             scaled up to the last axis value. If *axis* is specified, *end* should be a
             scalar, otherwise, *end* can be either a scalar (scale both axes by the same
@@ -178,43 +226,69 @@ class Signal2D(pd.DataFrame):
         -------
         : Signal2D
             A copy of Signal2D with scaled axes.
+
+        Note
+        ----
+        If only partial domain on the axis is specified for scaling results in non-monotonic
+        axis, an exception error will occur.
         """
+        if isinstance(axis, str):
+            axis = axis.lower()
+
+        start = self._verify_scalar_or2(start, [self.index[0], self.columns[0]])
+        stop = self._verify_scalar_or2(stop, [self.index[-1], self.columns[-1]])
+
+        if start[0] > stop[0] or start[1] > stop[1]:
+            raise ValueError('start should be smaller than end.')
+
         if axis is None:
-            try:
-                if len(scale) != 2:
-                    raise ValueError('scale should be either a scalar or 2 element array/tuple.')
-            except TypeError:
-                scale = [scale, scale]
-            try:
-                if len(start) != 2:
-                    raise ValueError('start should be either a scalar or 2 element array/tuple.')
-            except TypeError:
-                start = [start, start]
-            try:
-                if len(end) != 2:
-                    raise ValueError('end should be either a scalar or 2 element array/tuple.')
-            except TypeError:
-                end = [end, end]
-
-            if start[0] >= end[0] or start[1] >= end[1]:
-                raise ValueError('start should be smaller than end.')
-
-            newindex, newcol = self.index, self.columns
-            newindex[newindex >= start[0] & newindex <= end[0]] *= scale[0]
-            newcol[newcol >= start[1] & newcol <= end[1]] *= scale[1]
+            scale = self._verify_scalar_or2(scale)
+            newindex, newcol = self.index.values, self.columns.values
+            newindex[(newindex >= start[0]) & (newindex <= stop[0])] *= scale[0]
+            newcol[(newcol >= start[1]) & (newcol <= stop[1])] *= scale[1]
             return Signal2D(self.values, index=newindex, columns=newcol)
 
-        elif axis == 'Y' or axis == 0 or axis == 'index':
-            newindex = self.index
-            newindex[newindex >= start & newindex <= end] *= scale
+        elif axis == 'y' or axis == 0 or axis == 'index':
+            newindex = self.index.values
+            newindex[(newindex >= start[0]) & (newindex <= stop[0])] *= scale
             return Signal2D(self.values, index=newindex, columns=self.columns)
 
-        elif axis == 'X' or axis == 1:
-            newcol = self.columns
-            newcol[newcol >= start & newcol <= end] *= scale
-            return Signal2D(self.values, index=self.index, columns=self.newcol)
+        elif axis == 'x' or axis == 1 or axis == 'columns':
+            newcol = self.columns.values
+            newcol[(newcol >= start[1]) & (newcol <= stop[1])] *= scale
+            return Signal2D(self.values, index=self.index, columns=newcol)
         else:
             raise ValueError('Unknown axis value.')
+
+    # _____________________________________________________________ #
+    def skew(self, angle, axis=1, keepgrid=True, **kwargs):
+        """
+
+        """
+        X, Y = np.meshgrid(self.columns, self.index, indexing='xy')
+
+        if isinstance(axis, str):
+            axis = axis.lower()
+
+        if axis in [0, 'index', 'y']:
+            Y += X*np.tan(np.deg2rad(angle))
+        elif axis in [1, 'columns', 'x']:
+            X += Y*np.tan(np.deg2rad(angle))
+        else:
+            raise ValueError('Unknown value for axis.')
+
+        xnew = np.arange(np.min(X), np.max(X), 0.1*self.ts[1])
+        ynew = np.arange(np.min(Y), np.max(Y), 0.1*self.ts[0])
+        #ynew = coords[1].reshape(Y.shape)[::5, 0]
+
+        xv, yv = np.meshgrid(xnew, ynew, indexing='xy')
+
+        vals = griddata((Y.ravel(), X.ravel()), self.values.ravel(),
+                     (yv.ravel(), xv.ravel()), method='cubic', fill_value=10)
+
+        return Signal2D(vals.reshape(xv.shape), index=ynew, columns=xnew)
+        #return X, Y
+
 
     # _____________________________________________________________ #
     def flip(self, axis):
@@ -230,9 +304,9 @@ class Signal2D(pd.DataFrame):
                 New uFrame with axis flipped.
         """
         if axis == 'Y' or axis == 0 or axis == 'index':
-            return Signal2D(self.loc[::-1, :].values, index=self.index, columns=self.columns)
+            return Signal2D(self.values[::-1, :], index=self.index, columns=self.columns)
         elif axis == 'X' or axis == 1 or axis == 'columns':
-            return Signal2D(self.loc[:, ::-1].values, index=self.index, columns=self.columns)
+            return Signal2D(self.values[:, ::-1], index=self.index, columns=self.columns)
         else:
             raise ValueError('Unknown axis value. Shoud be 0/\'Y\'/\'index\'' +
                              'or 1/\'X\'/\'columns\'')
@@ -404,7 +478,7 @@ class Signal2D(pd.DataFrame):
 
     # _____________________________________________________________ #
     @property
-    def Xs(self):
+    def ts(self):
         """ Get the signal sampling period. """
         return np.mean(np.diff(self.index)), np.mean(np.diff(self.columns))
 
