@@ -2,19 +2,21 @@ import numpy as np
 import utkit as ut
 
 
-def saft(fname):
+def read_saft(fname):
     """
     Reads a binary file stored in SAFT format. SAFT is a custom scanner at PNNL.
 
-    Parameters:
-        fname (string):
-            Name of the file to open (with absolute or relative path).
+    Parameters
+    ----------
+    fname : string
+        Name of the file to open (with absolute or relative path).
 
-    Returns:
-         :class:`utkit.Signal3D`, header:
-            A 2-element tuple where the first element is the Signal3D stored in the SAFT file,
-            returned as a :class:`utkit.Signal3D` object. The second element is a dictionary
-            representing the SAFT file header fields.
+    Returns
+    -------
+    : utkit.Signal3D, header
+        A 2-element tuple where the first element is the Signal3D stored in the SAFT file,
+        returned as a :class:`utkit.Signal3D` object. The second element is a dictionary
+        representing the SAFT file header fields.
     """
     # Number of bytes in the file header
     NHEADER = 2**11

@@ -12,11 +12,9 @@
 """
 # from __future__ import absolute_import
 
-# import io.saft
-# import io.lecroy
-from .saft import saft
-from .lecroy import lecroy
-from .ultravision import ultravision
-from .civa import civa_bscan
+from .saft import read_saft
+from .lecroy import read_lecroy
+from .ultravision import read_ultravision
+from .civa import read_civa_bscan
 
 

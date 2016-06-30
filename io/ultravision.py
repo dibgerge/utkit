@@ -6,7 +6,7 @@ import numpy as np
 import utkit
 
 
-def ultravision(fname):
+def read_ultravision(fname):
     """
     Reads ultrasound scans saved in UltraVision (ZETEC, Inc. software) text file format.
 

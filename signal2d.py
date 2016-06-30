@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
-from scipy.signal import hilbert
+from scipy.signal import hilbert, get_window
 from scipy.interpolate import griddata
-
+from scipy.fftpack import fft2, fftfreq, fftshift
+import matplotlib.pyplot as plt
+from time import time
 from .signal3d import Signal3D
 
 
@@ -77,15 +79,35 @@ class Signal2D(pd.DataFrame):
         return Signal3D
 
     # _____________________________________________________________ #
-    def __call__(self, key0, key1, **kwargs):
+    def __call__(self, index, columns, **kwargs):
         """
-        Interpolate the axes
+        Interpolate the axes. This function used :func:`scipy.interpolate.griddata`.
 
         Parameters
         ----------
+        index : array_like
+            New index values to compute the interpolation.
+
+        columns : array_like
+            New columns values to compute the interpolation.
+
+        Returns
+        -------
+        : Signal2D
+            A new Signal2D object computed at the new given axes values.
+
+        Notes
+        -----
+        Other keyword arguments are passed directly to the interpolation function
+        :func:`scipy.interpolate.griddata`.
         """
-        return griddata((self.columns.values, self.index.values), self.values, (key1, key0),
-                        **kwargs)
+        index, columns = np.array(index), np.array(columns)
+        if (index.ndim != 1) or (columns.ndim != 1):
+            raise TypeError('New index and columns must be one dimensional arrays.')
+
+        xg, yg = np.meshgrid(self.columns, self.index, indexing='xy')
+        vals = griddata((yg.ravel(), xg.ravel()), self.values.ravel(), (index, columns), **kwargs)
+        return Signal2D(vals, index=index, columns=columns)
 
     # _____________________________________________________________ #
     def operate(self, option='', axis=0):
@@ -125,40 +147,149 @@ class Signal2D(pd.DataFrame):
             yout = 20*np.log10(np.abs(yout))
         return Signal2D(yout, index=self.index, columns=self.columns)
 
-    # _____________________________________________________________ #
     @staticmethod
-    def _verify_scalar_or2(val, assign=None):
+    def _make_axes_as_num(axes, soft_error=False):
         """
-        Verifies that the value is either a scalar, or a two element vector. If it is a scalar,
-        makes it a two element vector of same element values.
+        Takes an axis name, which could be the axis number of corresponding naming convention,
+        and always return the axis number.
 
         Parameters
         ----------
-        val : float, array_like
-            The value to verify if it is a scalar or 2 element array.
+        axes : int/string
+            The name of the axis
 
-        assign : array_like, 2 elements
-            A two element array that assigns the value if *val* is None.
+        soft_error : bool, optional
+            If :const:`True`, then an exception will be raised if the given axis name is not valid.
+            Otherwise, :const:`None` will be returned
 
         Returns
         -------
-        The new computed value according to whether *val* was :const:`None`, scalar,
-        or two eleemnt array.
+        : int
+            The axis number.
         """
-        try:
-            if len(val) != 2:
-                raise ValueError('scale should be either a scalar or 2 element array/tuple.')
-        except TypeError:
-            if val is None and assign is None:
-                return None
-            elif val is None:
-                return assign
-            else:
-                return [val, val]
-        return val
+        if axes is None:
+            return [0, 1]
+        if not hasattr(axes, '__len__'):
+            axes = (axes, )
 
-    # _____________________________________________________________ #
-    def shift_axis(self, shift, axis=None):
+        out_ax = []
+        for ax in axes:
+            if isinstance(ax, str):
+                ax = ax.lower()
+            if ax in [0, -2, 'y', 'index']:
+                out_ax.append(0)
+            elif ax in [1, -1, 'x', 'columns']:
+                out_ax.append(1)
+            else:
+                if not soft_error:
+                    raise ValueError('Unknown axis value.')
+        return out_ax
+
+    def _set_val_on_axes(self, val, axes, assign):
+        """
+        Internal method to verify that a value is 2-element array. If it is a scalar or
+        const:`None`, the missing values are selected based on the given *axis*.
+
+        Parameters
+        ---------
+        val : float, array_like
+            This is the value to be tested
+
+        axes : int
+            The axis for which the *val* corresponds.
+
+        assign : array_like, 2-elements
+            The values to assigns to new *val* if the input *val* is a scalar or const:`None`.
+
+        Returns
+        -------
+        : 2-tuple
+            A 2-element array representing the filled *val* with missing axis value.
+        """
+        out_vals = np.array(assign)
+        if len(out_vals) != 2:
+            raise ValueError('assign must be a two element sequence.')
+        axes = self._make_axes_as_num(axes)
+        out_vals[axes] = val
+        out_vals[np.isnan(out_vals)] = np.array(assign)[np.isnan(out_vals)]
+        return out_vals
+
+    def fft(self, ssb=False, axes=(0, 1), **kwargs):
+        """
+        Computes the Fourier transform in two dimensions, or along a specified axis.
+
+        Parameters
+        ----------
+        ssb : bool, optional
+            Determines if only the single sided Fourier transform will be returned.
+
+        axes : int, array_like, optional
+            The axes along which to compute the FFT.
+
+        Returns
+        -------
+        : Signal2D
+            A new signal representing the Fourier transform.
+
+        Note
+        ----
+        Keyword arguments can be given to the the underlying Fourier transform function
+        :func:`scipy.fftpack.fft2`.
+        """
+        fval = fftshift(fft2(self.values, axes, **kwargs), axes=axes)
+        coords = [self.axes[i].values for i in range(self.ndim)]
+        for ax in axes:
+            coords[ax] = fftshift(fftfreq(coords[ax].size, self.ts[ax]))
+        s = Signal2D(fval, index=coords[0], columns=coords[1])
+
+        if ssb:
+            for ax in axes:
+                coords[ax] = coords[ax][coords[ax] >= 0]
+            s = Signal2D(s, index=coords[0], columns=coords[1])
+        return s
+
+    def window(self, index1=None, index2=None, axes=None, is_positional=False, win_fcn='hann',
+               fftbins=False):
+        """
+
+        :param index1:
+        :param index2:
+        :param is_positional:
+        :param win_fcn:
+        :param fftbins:
+        :return:
+        """
+        wind = Signal2D(0, index=self.index, columns=self.columns)
+
+        indices = [index1, index2]
+        for i in [0, -1]:
+            if not is_positional:
+                indices[i] = self.index.get_loc(self.self.ndices[i][0], method='nearest')
+            indices[i] = self._set_val_on_axes(indices[i], axes, [i, i])
+
+
+            window1 = get_window(win_fcn, wind.loc[index1[0]:index2[0]].shape[0])
+
+        window2 = get_window(win_fcn, wind.loc[:, index1[1]:index2[1]].shape[1])
+        wind.loc[index1[0]:index2[0], index1[1]:index2[1]] = np.sqrt(np.outer(window1, window2))
+
+        if fftbins:
+            if wind[-index2:-index1].size == 0:
+                raise IndexError('The signal does not have values at the negative of the indices '
+                                 'supplied. Disable fftbins for one-sided windowing.')
+            wind[-index2:-index1] = get_window(win_fcn, len(wind[-index2:-index1]))
+        return self*wind
+
+    def filter_freq(self, cutoff, option='bp'):
+        """
+
+        :param cutoff:
+        :param option:
+        :return:
+        """
+        fval = self.fft()
+
+    def shift_axes(self, shift, axes=None):
         """
         Shifts an axis (or both axis) by a specified amount.
 
@@ -169,7 +300,7 @@ class Signal2D(pd.DataFrame):
             axis specified *shift* can be a scalar (shift both axes by the same amount),
             or a 2-element vector for a different shift value for each axis.
 
-        axis : int/string, optional
+        axes : int/string, optional
             If 0  or 'Y' or 'index', shift the index, if 1 or 'X' or 'columns', shift the
             columns. If None shift both.
 
@@ -178,22 +309,11 @@ class Signal2D(pd.DataFrame):
         Signal2D:
             A new Signal2D with shifted axes.
         """
-        if isinstance(axis, str):
-            axis = axis.lower()
-
-        if axis is None:
-            shift = self._verify_scalar_or2(shift)
-            return Signal2D(self.values, index=self.index-shift[0], columns=self.columns-shift[1])
-
-        elif axis == 'y' or axis == 0 or axis == 'index':
-            return Signal2D(self.values, index=self.index-shift, columns=self.columns)
-        elif axis == 'x' or axis == 1 or axis == 'columns':
-            return Signal2D(self.values, index=self.index, columns=self.columns-shift)
-        else:
-            raise ValueError('Unknown axis value given. See documentation for allowed axis values.')
+        shift = self._set_val_on_axes(shift, axes, [0, 0])
+        return Signal2D(self.values, index=self.index-shift[0], columns=self.columns-shift[1])
 
     # _____________________________________________________________ #
-    def scale_axis(self, scale, start=None, stop=None, axis=None):
+    def scale_axes(self, scale, start=None, stop=None, axes=None):
         """
         Scales a given axis (or both) by a given amount.
 
@@ -218,7 +338,7 @@ class Signal2D(pd.DataFrame):
             scalar, otherwise, *end* can be either a scalar (scale both axes by the same
             factor), or a 2-element array for scaling each axis differently.
 
-        axis : int/string, optional
+        axes : int/string, optional
             If 0, 'Y' or index, scale the index, if 1, 'X' or 'columns', scale the columns. If None
             scale both axes.
 
@@ -232,65 +352,114 @@ class Signal2D(pd.DataFrame):
         If only partial domain on the axis is specified for scaling results in non-monotonic
         axis, an exception error will occur.
         """
-        if isinstance(axis, str):
-            axis = axis.lower()
-
-        start = self._verify_scalar_or2(start, [self.index[0], self.columns[0]])
-        stop = self._verify_scalar_or2(stop, [self.index[-1], self.columns[-1]])
-
+        start = self._set_val_on_axes(start, axes, [self.index[0], self.columns[0]])
+        stop = self._set_val_on_axes(stop, axes, [self.index[-1], self.columns[-1]])
         if start[0] > stop[0] or start[1] > stop[1]:
             raise ValueError('start should be smaller than end.')
 
-        if axis is None:
-            scale = self._verify_scalar_or2(scale)
-            newindex, newcol = self.index.values, self.columns.values
-            newindex[(newindex >= start[0]) & (newindex <= stop[0])] *= scale[0]
-            newcol[(newcol >= start[1]) & (newcol <= stop[1])] *= scale[1]
-            return Signal2D(self.values, index=newindex, columns=newcol)
-
-        elif axis == 'y' or axis == 0 or axis == 'index':
-            newindex = self.index.values
-            newindex[(newindex >= start[0]) & (newindex <= stop[0])] *= scale
-            return Signal2D(self.values, index=newindex, columns=self.columns)
-
-        elif axis == 'x' or axis == 1 or axis == 'columns':
-            newcol = self.columns.values
-            newcol[(newcol >= start[1]) & (newcol <= stop[1])] *= scale
-            return Signal2D(self.values, index=self.index, columns=newcol)
-        else:
-            raise ValueError('Unknown axis value.')
+        scale = self._set_val_on_axes(scale, axes, [1., 1.])
+        newindex, newcol = self.index.values, self.columns.values
+        newindex[(newindex >= start[0]) & (newindex <= stop[0])] *= scale[0]
+        newcol[(newcol >= start[1]) & (newcol <= stop[1])] *= scale[1]
+        return Signal2D(self.values, index=newindex, columns=newcol)
 
     # _____________________________________________________________ #
-    def skew(self, angle, axis=1, keepgrid=True, **kwargs):
+    def skew(self, angle, axes=1, start=None, stop=None, ts=None, interpolate=True, **kwargs):
         """
+        Applies a skew transformation on the data.
 
+        Parameters
+        ----------
+        angle : float, array_like
+            The angle to skew the Scan2D coordinates. If *axis* is not specified, and *angle*
+            is scalar, then a skew is applied on both axes with the same angle.
+
+        axes : integer, str, optional
+            The axis along which to skew. to skew the image horizontally, axis can be 0, 'y',
+            or 'index. To skew the image vertically, it can be 1, 'x', or 'columns'. If axis is
+            set to None, then both axes are skewed.
+
+        start : float, array_like, optional
+            The starting coordinate (in Signal2D axes units) to apply the skew
+            operation. If it is not specified, apply the skew starting from the first coordinate
+            value. If it is a scalar and axis is :const:`None`, then set the start to be the same
+            for both axes.
+
+        stop : float, array_like, optional
+            The stop coordinate (in Signal2D axes units) for the skew operation. Same conditions
+            apply as those of *start*
+
+        interpolate : bool, optional
+            If const:`True`, realign the skewed axes on a regular grid, and use interpolation to
+            recompute the values of the Signal2D at the new regular grid. The new grid will be
+            computed to span the new range of the axes.Otherwise,  no realignment will occur,
+            and due to the skew operation, the Signal2D values are not
+            on a regular grid.
+
+        ts : float, array_like, optional
+            Only required if *interpolate* is set to :const:`True`. Specified the sampling interval
+            for the new regular grid used in the interpolation. If not specified,
+            then by default, the current sampling intervals of the Signal2D object will be used.
+
+        Returns
+        -------
+        signal2D : Signal2D
+            If *interpolate* is :const:`True`, then a new Signal2D object is returned,
+            after interpolation onto a regular grid.
+
+        X, Y : ndarray tuple
+            If *interpolate* is :const:`False`, then only the new skewed coordinates are returned as
+            2-D grid numpy matrices. The elements of these matrices correspond to the values in
+            the current Signal2D object.
         """
-        X, Y = np.meshgrid(self.columns, self.index, indexing='xy')
+        start = self._set_val_on_axes(start, axes, [self.index[0], self.columns[0]])
+        stop = self._set_val_on_axes(stop, axes, [self.index[-1], self.columns[-1]])
+        if start[0] > stop[0] or start[1] > stop[1]:
+            raise ValueError('start should be smaller than end.')
+        tan_angle = np.tan(np.deg2rad(self._set_val_on_axes(angle, axes, [0., 0.])))
+        skew_matrix = [[1, tan_angle[1]], [tan_angle[0], 1]]
 
-        if isinstance(axis, str):
-            axis = axis.lower()
+        x, y = np.meshgrid(self.columns, self.index, indexing='xy')
+        xstart_ind = self.x.get_loc(start[1], method='nearest')
+        xstop_ind = self.x.get_loc(stop[1], method='nearest')
+        ystart_ind = self.y.get_loc(start[0], method='nearest')
+        ystop_ind = self.y.get_loc(stop[0], method='nearest')
+        # these are used to modify x and y in place.
+        xslice = x[ystart_ind:ystop_ind+1, xstart_ind:xstop_ind+1]
+        yslice = y[ystart_ind:ystop_ind+1, xstart_ind:xstop_ind+1]
+        xskew, yskew = np.dot(skew_matrix, np.array([xslice.ravel(), yslice.ravel()]))
+        xslice[:], yslice[:] = xskew.reshape(xslice.shape), yskew.reshape(yslice.shape)
 
-        if axis in [0, 'index', 'y']:
-            Y += X*np.tan(np.deg2rad(angle))
-        elif axis in [1, 'columns', 'x']:
-            X += Y*np.tan(np.deg2rad(angle))
+        if interpolate:
+            if not hasattr(ts, '__len__'):
+                ts = self._set_val_on_axes(ts, axes, self.ts)
+
+            xnew = np.arange(np.min(x), np.max(x) + ts[1], ts[1])
+            ynew = np.arange(np.min(y), np.max(y) + ts[0], ts[0])
+            xv, yv = np.meshgrid(xnew, ynew, indexing='xy')
+            vals = griddata((y.ravel(), x.ravel()), self.values.ravel(), (yv, xv), **kwargs)
+
+            if ('method' in kwargs) and (kwargs['method'] == 'nearest'):
+                axes = self._make_axes_as_num(axes)
+                if 1 in axes:
+                    smin = pd.Series(np.min(x, axis=1),
+                                     index=self.y).reindex(ynew, method='nearest')
+                    smax = pd.Series(np.max(x, axis=1),
+                                     index=self.y).reindex(ynew, method='nearest')
+                    vals[xnew-smin.values.reshape(-1, 1) < 0] = np.nan
+                    vals[xnew-smax.values.reshape(-1, 1) > 0] = np.nan
+                if 0 in axes:
+                    smin = pd.Series(np.min(y, axis=0),
+                                     index=self.x).reindex(xnew, method='nearest')
+                    smax = pd.Series(np.max(y, axis=0),
+                                     index=self.x).reindex(xnew, method='nearest')
+                    vals[ynew.reshape(-1, 1)-smin.values < 0] = np.nan
+                    vals[ynew.reshape(-1, 1)-smax.values > 0] = np.nan
+
+            return Signal2D(vals, index=ynew, columns=xnew)
         else:
-            raise ValueError('Unknown value for axis.')
+            return x, y
 
-        xnew = np.arange(np.min(X), np.max(X), 0.1*self.ts[1])
-        ynew = np.arange(np.min(Y), np.max(Y), 0.1*self.ts[0])
-        #ynew = coords[1].reshape(Y.shape)[::5, 0]
-
-        xv, yv = np.meshgrid(xnew, ynew, indexing='xy')
-
-        vals = griddata((Y.ravel(), X.ravel()), self.values.ravel(),
-                     (yv.ravel(), xv.ravel()), method='cubic', fill_value=10)
-
-        return Signal2D(vals.reshape(xv.shape), index=ynew, columns=xnew)
-        #return X, Y
-
-
-    # _____________________________________________________________ #
     def flip(self, axis):
         """
         Flips the values of the uFrame without flipping corresponding X/Y-axes coordinates.
@@ -484,12 +653,15 @@ class Signal2D(pd.DataFrame):
 
     # _____________________________________________________________ #
     @property
-    def X(self):
+    def x(self):
         """ Convenience property to return X-axis coordinates as ndarray. """
-        return self.axes[1].values
+        return self.axes[1]
 
     # _____________________________________________________________ #
     @property
-    def Y(self):
+    def y(self):
         """ Convenience property to return Y-axis coordinates as ndarray. """
-        return self.axes[0].values
+        return self.axes[0]
+
+Signal2D._setup_axes(['index', 'columns'], info_axis=1, stat_axis=0,
+                      axes_are_reversed=True, aliases={'rows': 0, 'y': 0, 'x': 1})

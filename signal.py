@@ -325,7 +325,7 @@ class Signal(pd.Series):
         if threshold > 0:
             raise ValueError("threshold should be dB value <= 0, which is relative to the "
                              "normalized maximum amplitude.")
-        senv = self.operate('end')
+        senv = self.operate('nd')
         ind = np.where(senv >= threshold)[0]
         tout = []
         # make linear interpolation to get time value at threshold
@@ -486,7 +486,7 @@ class Signal(pd.Series):
         Parameters
         ----------
         cutoff : float or (2,) tuple
-            The cuttoff frequency (Hz) of the filter. This is a scalar value if type
+            The cutoff frequency (Hz) of the filter. This is a scalar value if type
             is ``'lp'`` or ``'hp'``. When type is ``'bp'``, cutoff  should be a 2 element list,
             where the first element specifies the lower cutoff frequency, and the second element
             specifies the upper cutoff frequency.
@@ -608,8 +608,8 @@ class Signal(pd.Series):
             raise ValueError("threshold should be dB value <= 0.")
 
         fdomain = self.fft(ssb=True, nfft=nfft)
-        Yn = fdomain.operate('nd')
-        lims = Yn.limits(threshold)
+        lims = fdomain.abs().limits(threshold)
+        print(lims)
         return lims[1] - lims[0]
 
     # _____________________________________________________________ #

@@ -3,7 +3,7 @@ import utkit
 import re
 
 
-def civa_bscan(fname):
+def read_civa_bscan(fname):
     """
     Reads a B-scan txt file saved in CIVA-UT modeling software.
 

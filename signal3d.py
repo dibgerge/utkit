@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+from scipy.interpolate import griddata
+from scipy.signal import hilbert
 from pandas.tools.util import cartesian_product
 
 
@@ -27,73 +29,174 @@ class Signal3D(pd.Panel):
         from .signal2d import Signal2D
         return Signal2D
 
+    def operate(self, option='', axis=0):
+        yout = self
+        if 'e' in option:
+            yout = np.abs(hilbert(yout, axis=axis))
+        if 'n' in option:
+            yout = yout/np.abs(yout).max().max()
+        if 'd' in option:
+            yout = 20*np.log10(np.abs(yout))
+        return Signal3D(yout, items=self.items, major_axis=self.major_axis,
+                        minor_axis=self.minor_axis)
+
+    # _____________________________________________________________ #
+    def _verify_val_and_axis(self, val, axis, assign, raise_none=True):
+        """
+        Internal method to verify that a value is 3-element array. If it is a scalar or
+        const:`None`, the missing values are selected based on the given *axis*.
+
+        Parameters
+        ---------
+        val : float, array_like
+            This is the value to be tested
+
+        axis : int
+            The axis for which the *val* corresponds.
+
+        assign : array_like, 3-elements
+            The values to assigns to new *val* if the input *val* is a scalar or const:`None`.
+
+        raise_none : bool, optional
+            If const:`True`, raise an error if *val* is const:`None`.
+
+        Returns
+        -------
+        : 2-tuple
+            A 2-element array representing the filled *val* with missing axis value.
+        """
+        axis = self._make_axis_as_num(axis)
+
+        if isinstance(axis, str):
+            axis = axis.lower()
+
+        if val is None:
+            if raise_none:
+                raise ValueError('value cannot be None.')
+            return assign
+
+        try:
+            if len(val) != 3:
+                raise ValueError('value should be either a scalar or a 3 element array.')
+            if axis is None:
+                return val
+            else:
+                raise ValueError('value must be a scalar is axis is specified.')
+        except TypeError:
+            if axis is None:
+                return [val, val, val]
+            elif axis == 0:
+                return [val, assign[1], assign[2]]
+            elif axis == 1:
+                return [assign[0], val, assign[2]]
+            elif axis == 2:
+                return [assign[0], assign[1], val]
+            else:
+                raise ValueError('Unknown value for axis. See documentation for allowed axis '
+                                 'values.')
+
     # _____________________________________________________________ #
     def shift_axis(self, shift, axis=None):
         """
         Applies shifting of a given axis.
 
-        Parameters:
-            shift (float) :
-                The amount to shift the axis.
+        Parameters
+        ----------
+        shift : float
+            The amount to shift the axis.
 
-            axis (int/string, optional):
-                If 0/'Y'/'items', shift the Y-axis, if 1/'t'/'major_axis',
-                shift the t-axis. If 2/'X'/'minor_axis' shift the X-axis.
-                If None shift all axes.
+        axis : int/string, optional
+            If 0/'Y'/'items', shift the Y-axis, if 1/'t'/'major_axis', shift the t-axis. If
+            2/'X'/'minor_axis' shift the X-axis. If None shift all axes.
 
-        Returns:
-            Signal2D: A copy of Scan2D with shiftes axes.
+        Returns
+        -------
+        : Signal3D
+            A copy of Signal3D with shifts axes.
         """
-        ynew = self.copy()
-        if axis is None:
-            ynew.items -= shift[0]
-            ynew.major_axis -= shift[1]
-            ynew.minor_axis -= shift[2]
-        elif axis == 'Y' or axis == 0 or axis == 'items':
-            ynew.items -= shift
-        elif axis == 't' or axis == 1 or axis == 'major_axis':
-            ynew.major_axis -= shift
-        elif axis == 'X' or axis == 2 or axis == 'minor_axis':
-            ynew.minor_axis -= shift
-        else:
-            raise ValueError('Unknown value for axis.')
-        return ynew
+        shift = self._verify_val_and_axis(shift, axis, assign=[0, 0, 0], raise_none=True)
+        return Signal3D(self.values, items=self.items-shift[0],
+                        major_axis=self.major_axis-shift[1], minor_axis=self.minor_axis-shift[2])
 
     # _____________________________________________________________ #
-    def scale_axis(self, scale, axis=None):
+    def scale_axes(self, scale, start=None, stop=None, axis=None):
         """
-        Applies scaling of a given axis.
+        Scales a given axis (or both) by a given amount.
 
-        Parameters:
-            scale (float) :
-                The amount to scale the axis.
+        Parameters
+        ----------
+        scale : float, array_like
+            The amount to scale the axis. If axis is specified,
+            *scale* should be scalar. If no axis specified *scale* can be a scalar (scale both
+            axes by the same amount), or a 2-element vector for a different scale value for each
+            axis.
 
-            axis (int/string, optional):
-                If 0/'Y'/'items', scale the Y-axis, if 1/'t'/'major_axis',
-                scale the t-axis. If 2/'X'/'minor_axis' scale the X-axis.
-                If None scale all axes.
+        start : float, optional
+            The axis value at which to start applying the scaling. If not
+            specified, the whole axis will be scaled starting from the first axis value. If
+            *axis* is specified, *start* should be a scalar, otherwise, *start* can be either a
+            scalar (scale both axes by the same factor), or a 2-element array for scaling each
+            axis differently.
 
-        Returns:
-            Signal2D :
-                A copy of Scan2D with scaled axes.
+        stop : float, optional
+            The axis value at which to end the scaling. If not specified, the axis will be
+            scaled up to the last axis value. If *axis* is specified, *end* should be a
+            scalar, otherwise, *end* can be either a scalar (scale both axes by the same
+            factor), or a 2-element array for scaling each axis differently.
+
+        axis : int/string, optional
+            If 0, 'Y' or index, scale the index, if 1, 'X' or 'columns', scale the columns. If None
+            scale both axes.
+
+        Returns
+        -------
+        : Signal2D
+            A copy of Signal2D with scaled axes.
+
+        Note
+        ----
+        If only partial domain on the axis is specified for scaling results in non-monotonic
+        axis, an exception error will occur.
         """
-        ynew = self.copy()
-        if axis is None:
-            ynew.items *= scale
-            ynew.major_axis *= scale
-            ynew.minor_axis *= scale
-        elif axis == 'Y' or axis == 0 or axis == 'items':
-            ynew.items *= scale
-        elif axis == 't' or axis == 1 or axis == 'major_axis':
-            ynew.major_axis *= scale
-        elif axis == 'X' or axis == 2 or axis == 'minor_axis':
-            ynew.minor_axis *= scale
+        start = self._verify_val_and_axis(start, axis, [self.axes[0][0], self.axes[1][0],
+                                                        self.axes[2][0]], raise_none=False)
+        stop = self._verify_val_and_axis(stop, axis, [self.axes[0][-1], self.axes[1][-1],
+                                                      self.axes[2][-1]], raise_none=False)
+
+        if start[0] > stop[0] or start[1] > stop[1] or start[2] > stop[2]:
+            raise ValueError('start should be smaller than end.')
+
+        scale = self._verify_val_and_axis(scale, axis, [1., 1., 1.], raise_none=True)
+        newitems, newmajor, newminor = self.items.values, self.major_axis.values, \
+                                       self.minor_axis.values
+        newitems[(newitems >= start[0]) & (newitems <= stop[0])] *= scale[0]
+        newmajor[(newmajor >= start[1]) & (newmajor <= stop[1])] *= scale[1]
+        newminor[(newminor >= start[1]) & (newminor <= stop[2])] *= scale[2]
+        return Signal3D(self.values, items=newitems, major_axis=newmajor, minor_axis=newminor)
+
+    @staticmethod
+    def _make_axis_as_num(axis, soft_error=False):
+        """
+
+        :param axis:
+        :return:
+        """
+        if isinstance(axis, str):
+            axis = axis.lower()
+
+        if axis in [0, 'y', 'items']:
+            return 0
+        if axis in [1, 't', 'major_axis']:
+            return 1
+        if axis in [2, 'x', 'minor_axis']:
+            return 2
+
+        if soft_error:
+            return None
         else:
-            raise ValueError('Unknown value for axis.')
-        return ynew
+            raise ValueError('Unknown axis value.')
 
-    # _______________________________________________________________________#
-    def bscan(self, depth='max'):
+    def bscan(self, option='max'):
         """
         Computes B-scan image generally used for Utrasound Testing.
         Slices the raster scan along the X-t axes (i.e. at a given Y location).
@@ -106,20 +209,18 @@ class Signal3D(pd.Panel):
             Signal2D :
                 A Scan2D object representing the B-scan.
         """
-        if depth == 'max':
-            _, Y = self.cscan().max_point()
-            return self.loc[Y, :, :]
+        if option == 'max':
+            s = self.apply(lambda x: x.max().max(), axis=(1, 2))
+        elif option == 'var':
+            s = self.apply(lambda x: x.var().var(), axis=(1, 2))
         else:
-            if depth > self.items.max() or depth < self.items.min():
-                raise ValueError('depth is outside range of scan in Y-direction.')
-            # find the nearest Y-coordinate near the given depth
-            ind = self.items[np.abs(self.items.values - depth).argmin()]
-            return self.loc[ind, :, :]
+            raise ValueError('Unknown option.')
+        print(s.idxmax())
+        return self[s.idxmax()]
 
-    # _______________________________________________________________________#
     def dscan(self, depth='max'):
         """
-        Convenience method that return b-scans for Utrasound Testing raster scans.
+        Convenience method that return b-scans for Ultrasound Testing raster scans.
         Slices the raster scan along the Y-t axes (i.e. at a given X location).
 
         Parameters:
@@ -140,10 +241,9 @@ class Signal3D(pd.Panel):
             ind = self.minor_axis[np.abs(self.minor_axis.values - depth).argmin()]
             return self.loc[:, :, ind]
 
-    # _______________________________________________________________________#
-    def cscan(self, depth='project', option='max', skew_angle=0):
+    def cscan(self, depth='project', skew_angle=0, method='nearest', **kwargs):
         """
-        Computes C-scan image generally used for Utrasound Testing. This collapses the
+        Computes C-scan image generally used for Ultrasound Testing. This collapses the
         raster scan along the T direction, or takes a slice at a given T coordinate,
         resulting in an image spanning the X-Y axes.
 
@@ -153,14 +253,7 @@ class Signal3D(pd.Panel):
                 'project' collapses the whole T-axis into a single value using the methodology
                 specified by the option parameter. 'max' obtains the
                 T-axis coordinate where the T-value is maximum. Otherwise depth
-                is a float value specifiying the actual T-coordinate value.
-
-            option (string, optional) :
-                This is relevant only if depth is 'project'.
-                Then option specifies how the projection is done. If 'max', then
-                at each X-Y point, the maximum value along the T-axis is selected.
-                If 'enegry', then at each X-Y point, the total signal energy
-                along the T-axis is computed.
+                is a float value specifying the actual T-coordinate value.
 
             skew_angle (float, optional) :
                 Skews the X-direction to be aligned with the ultrasonic beam angle,
@@ -171,18 +264,11 @@ class Signal3D(pd.Panel):
                 A Scan2D object representing the C-scan.
         """
         if depth == 'project':
-            X, t, _ = self.iloc[0, :, :].flatten(skew_angle=skew_angle)
-            X = np.around(X / self.Xs[2])*self.Xs[2]
-            df = uFrame(self.to_frame().values, index=[t, X], columns=self.axes[0])
-            if option == 'energy':
-                return uFrame(df.var(level=1)).T
-            elif option == 'max':
-                return uFrame(df.max(level=1)).T
-            else:
-                raise ValueError('Uknown value for option.')
+            uskew = self.apply(lambda x: x.skew(skew_angle, axes=1, method=method, **kwargs),
+                               axis=(1, 2))
+            return uskew.std(axis=1).T
         elif depth == 'max':
-            _, ind = self.bscan().max_point()
-            return self.loc[:, ind, :].T
+            return self.abs().max(axis=1).T
         else:
             if depth > self.major_axis.max() or depth < self.major_axis.min():
                 raise ValueError('depth is outside range of scan in T-direction.')
@@ -190,7 +276,6 @@ class Signal3D(pd.Panel):
             ind = self.major_axis[np.abs(self.major_axis.values - depth).argmin()]
             return self.loc[:, ind, :].T
 
-    # _______________________________________________________________________#
     def flatten(self):
         """
         Flatten an array and its corresponding indices.
@@ -203,95 +288,29 @@ class Signal3D(pd.Panel):
         yv, tv, xv = np.meshgrid(self.Y, self.t, self.X, indexing='xy')
         return np.array([yv.ravel(), tv.ravel(), xv.ravel(), self.values.ravel()])
 
-    # _______________________________________________________________________#
-    def _apply_1d(self, func, axis):
-        """
-        This function copied from Pandas Panel definition, and modified to support the
-        utkit subclass heirarchy.
-        """
-        axis_name = self._get_axis_name(axis)
-        # ax = self._get_axis(axis)
-        ndim = self.ndim
-        values = self.values
+    @property
+    def axis(self):
+        return self.items, self.major_axis, self.minor_axis
 
-        # iter thru the axes
-        slice_axis = self._get_axis(axis)
-        slice_indexer = [0] * (ndim - 1)
-        indexer = np.zeros(ndim, 'O')
-        indlist = list(range(ndim))
-        indlist.remove(axis)
-        indexer[axis] = slice(None, None)
-        indexer.put(indlist, slice_indexer)
-        planes = [self._get_axis(axi) for axi in indlist]
-        shape = np.array(self.shape).take(indlist)
-
-        # all the iteration points
-        points = cartesian_product(planes)
-
-        results = []
-        for i in range(np.prod(shape)):
-            # construct the objectD
-            pts = tuple([p[i] for p in points])
-            indexer.put(indlist, slice_indexer)
-
-            obj = Signal(values[tuple(indexer)], index=slice_axis, name=pts)
-            result = func(obj)
-            results.append(result)
-
-            # increment the indexer
-            slice_indexer[-1] += 1
-            n = -1
-            while (slice_indexer[n] >= shape[n]) and (n > (1 - ndim)):
-                slice_indexer[n - 1] += 1
-                slice_indexer[n] = 0
-                n -= 1
-
-        # empty object
-        if not len(results):
-            return self._constructor(**self._construct_axes_dict())
-
-        # same ndim as current
-        if isinstance(results[0], Signal):
-            arr = np.vstack([r.values for r in results])
-            arr = arr.T.reshape(tuple([len(slice_axis)] + list(shape)))
-            tranp = np.array([axis] + indlist).argsort()
-            arr = arr.transpose(tuple(list(tranp)))
-            return self._constructor(arr, **self._construct_axes_dict())
-
-        # ndim-1 shape
-        results = np.array(results).reshape(shape)
-        if results.ndim == 2 and axis_name != self._info_axis_name:
-            results = results.T
-            planes = planes[::-1]
-        return self._construct_return_type(results, planes)
-
-    # TODO: Potential new methods:
-    #        * resample
+    @property
+    def ts(self):
+        return np.mean(np.diff(self.items)), np.mean(np.diff(self.major_axis)),\
+               np.mean(np.diff(self.minor_axis))
 
     # _______________________________________________________________________#
     @property
-    def Xs(self):
-        """
-        The sampling intervals for the three axes (X, Y, T).
-        """
-        return np.mean(np.diff(self.items.values)),\
-            np.mean(np.diff(self.major_axis.values)),\
-            np.mean(np.diff(self.minor_axis.values))
-
-    # _______________________________________________________________________#
-    @property
-    def X(self):
+    def x(self):
         """ Convenience property to return X-axis coordinates as ndarray. """
         return self.minor_axis.values
 
 # _______________________________________________________________________#
     @property
-    def Y(self):
+    def y(self):
         """ Convenience property to return Y-axis coordinates as ndarray. """
         return self.items.values
 
 # _______________________________________________________________________#
     @property
-    def t(self):
+    def z(self):
         """ Convenience property to return t-axis coordinates as ndarray. """
         return self.major_axis.values

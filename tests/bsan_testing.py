@@ -10,13 +10,13 @@ def test_interp2():
     probe_delay = 2 * 25 * 1e-3 / 2680.0
     bscan = civa_bscan(join('..', 'data', 'B04_E_5MHz_60S_+x_HalfInch_bscan.txt'))
     bscan = bscan.shift_axis(probe_delay,
-                             axis=0).scale_axis(np.cos(np.deg2rad(60))*3156.0/2.0,
-                                                axis=0).operate('nde')
-    bscan = bscan.iloc[::20,:].copy()
+                             axis=0).scale_axes(np.cos(np.deg2rad(60)) * 3156.0 / 2.0, axis=0).operate('nde')
+    bscan = bscan.iloc[::30,:].copy()
     ct = time()
-    bscan = bscan.skew(60, axis=1)
+    bscan = bscan.skew(60, axes=0, ts=[0.05e-3, 0.05e-3], method='cubic')
     print(time() - ct)
     #print(bscan.head())
+    bscan = bscan.fillna(10)
     plt.figure()
     plt.pcolormesh(bscan.columns, bscan.index, bscan.values, vmax=0, vmin=-50)
     ax = plt.gca()
@@ -31,7 +31,7 @@ def interp(option='linear'):
     gridx, gridy = np.mgrid[0.02:0.080:50j, 0.00:0.030:50j]
 
     bscan = civa_bscan(join('..', 'data', 'B04_E_5MHz_60S_+x_HalfInch_bscan.txt'))
-    bscan = bscan.shift_axis(probe_delay, axis=0).scale_axis(3156.0/2.0, axis=0).operate('nde')
+    bscan = bscan.shift_axis(probe_delay, axis=0).scale_axes(3156.0 / 2.0, axis=0).operate('nde')
     bscan = bscan.iloc[::20, :].copy()
     X, Y = np.meshgrid(bscan.columns, bscan.index, indexing='xy')
     X += Y * np.sin(np.deg2rad(60))
