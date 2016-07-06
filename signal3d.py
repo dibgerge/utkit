@@ -1,8 +1,6 @@
 import pandas as pd
 import numpy as np
-from scipy.interpolate import griddata
 from scipy.signal import hilbert
-from pandas.tools.util import cartesian_product
 
 
 class Signal3D(pd.Panel):
@@ -11,9 +9,9 @@ class Signal3D(pd.Panel):
     (X, Y), and contains a time series signal with time base t.
     The axes are such that:
 
-        * **axis 0 (items)**: *Y*-direction representing scan index,
+        * **axis 0 (items)**: *y*-axis representing scan index,
         * **axis 1 (major_axis)**: time base *t* for each time series,
-        * **axis 2 (minor_axis)**: *X*-direction representing scan position.
+        * **axis 2 (minor_axis)**: *x*-axis representing scan position.
 
     .. autosummary::
 
@@ -30,6 +28,33 @@ class Signal3D(pd.Panel):
         return Signal2D
 
     def operate(self, option='', axis=0):
+        """
+        Operate on the signal along a given axis.
+
+        Parameters
+        ----------
+        option : string/char, optional
+            The possible options are (combined options are allowed):
+
+             +--------------------+--------------------------------------+
+             | *option*           | Meaning                              |
+             +====================+======================================+
+             | '' *(Default)*     | Return the raw signal                |
+             +--------------------+--------------------------------------+
+             | 'n'                | normalized signal                    |
+             +--------------------+--------------------------------------+
+             | 'd'                | decibel value                        |
+             +--------------------+--------------------------------------+
+
+        axis : int, optional
+            Only used in the case option specified 'e' for envelop. Specifies along which axis to
+            compute the envelop.
+
+        Returns
+        -------
+        : Signal3D
+            The modified Signal3D.
+        """
         yout = self
         if 'e' in option:
             yout = np.abs(hilbert(yout, axis=axis))
@@ -40,7 +65,36 @@ class Signal3D(pd.Panel):
         return Signal3D(yout, items=self.items, major_axis=self.major_axis,
                         minor_axis=self.minor_axis)
 
-    # _____________________________________________________________ #
+    def _get_other_axes(self, axis):
+        axis = self._make_axis_as_num(axis)
+        if axis == 0:
+            return [1, 2]
+        if axis == 1:
+            return [0, 2]
+        if axis == 2:
+            return [0, 1]
+        raise ValueError('Unknown axis value.')
+
+    @staticmethod
+    def _make_axis_as_num(axis, soft_error=False):
+        """
+        Returns the number of the axis, according to the naming conventions of the axes.
+        """
+        if isinstance(axis, str):
+            axis = axis.lower()
+
+        if axis in [0, 'y', 'items']:
+            return 0
+        if axis in [1, 't', 'major_axis']:
+            return 1
+        if axis in [2, 'x', 'minor_axis']:
+            return 2
+
+        if soft_error:
+            return None
+        else:
+            raise ValueError('Unknown axis value.')
+
     def _verify_val_and_axis(self, val, axis, assign, raise_none=True):
         """
         Internal method to verify that a value is 3-element array. If it is a scalar or
@@ -95,7 +149,6 @@ class Signal3D(pd.Panel):
                 raise ValueError('Unknown value for axis. See documentation for allowed axis '
                                  'values.')
 
-    # _____________________________________________________________ #
     def shift_axis(self, shift, axis=None):
         """
         Applies shifting of a given axis.
@@ -106,8 +159,8 @@ class Signal3D(pd.Panel):
             The amount to shift the axis.
 
         axis : int/string, optional
-            If 0/'Y'/'items', shift the Y-axis, if 1/'t'/'major_axis', shift the t-axis. If
-            2/'X'/'minor_axis' shift the X-axis. If None shift all axes.
+            If 0/'y'/'items', shift the y-axis, if 1/'t'/'major_axis', shift the t-axis. If
+            2/'x'/'minor_axis' shift the x-axis. If None shift all axes.
 
         Returns
         -------
@@ -118,7 +171,6 @@ class Signal3D(pd.Panel):
         return Signal3D(self.values, items=self.items-shift[0],
                         major_axis=self.major_axis-shift[1], minor_axis=self.minor_axis-shift[2])
 
-    # _____________________________________________________________ #
     def scale_axes(self, scale, start=None, stop=None, axis=None):
         """
         Scales a given axis (or both) by a given amount.
@@ -174,142 +226,178 @@ class Signal3D(pd.Panel):
         newminor[(newminor >= start[1]) & (newminor <= stop[2])] *= scale[2]
         return Signal3D(self.values, items=newitems, major_axis=newmajor, minor_axis=newminor)
 
-    @staticmethod
-    def _make_axis_as_num(axis, soft_error=False):
+    def extract(self, option='max', axis=0):
         """
+        Extracts a Signal2D according to a given option by slicing along a specified axis.
 
-        :param axis:
-        :return:
+        Parameters
+        ----------
+        option : {'max', 'var', float} optional
+            Select the method to find the slice
+            * 'max': The maximum amplitude along the axis
+            * 'var': the maximum variance along the axis.
+            * scalar: A scalar can be specified to select a specific point along the axis
+
+        axis : scalar/string, optional
+            The axis along which to extract the slice.  Conventions for naming axes: 0/'y'/'items',
+            1/'t'/'major_axis', or 2/'x'/'minor_axis'.
+
+        Returns
+        -------
+        : Signal2D
+            A Signal2D object representing the slice.
         """
-        if isinstance(axis, str):
-            axis = axis.lower()
+        axis = self._make_axis_as_num(axis)
+        other_axes = self._get_other_axes(axis)
 
-        if axis in [0, 'y', 'items']:
-            return 0
-        if axis in [1, 't', 'major_axis']:
-            return 1
-        if axis in [2, 'x', 'minor_axis']:
-            return 2
+        if option == 'max':
+            s = self.apply(lambda x: x.max().max(), axis=other_axes)
+            option = s.idxmax()
+        elif option == 'var':
+            s = self.apply(lambda x: x.var().var(), axis=other_axes)
+            option = s.idxmax()
 
-        if soft_error:
-            return None
-        else:
-            raise ValueError('Unknown axis value.')
+        if 0 in axis:
+            return self.loc[option]
+        elif 1 in axis:
+            return self.loc[:, option, :]
+        elif 2 in axis:
+            return self.loc[:, :, option]
+        raise ValueError('Unknown axis value.')
+
+    def dscan(self, option='max'):
+        """
+        Convenience method that return D-scans from Ultrasound Testing raster scans.
+        Slices the raster scan along the y-t axes (i.e. at a given x location).
+
+        Parameters
+        ----------
+        option : {'max', 'var', float} optional
+            Select the method to find the slice
+            * 'max': The maximum amplitude along the axis
+            * 'var': the maximum variance along the axis.
+            * scalar: A scalar can be specified to select a specific point along the axis
+
+        Returns
+        -------
+        : Signal2D
+            Extracted D-scan as a Signal2D object.
+        """
+        return self.extract(option, axis=2)
 
     def bscan(self, option='max'):
         """
-        Computes B-scan image generally used for Utrasound Testing.
-        Slices the raster scan along the X-t axes (i.e. at a given Y location).
+        Convenience method that return B-scans from Ultrasound Testing raster scans.
+        Slices the raster scan along the x-t axes (i.e. at a given y location).
 
-        Parameters :
-            depth (float/string, optional) :
-                Select which slice to be used for the b-scan. If 'max', the
-                slice passing through the maximum point is selected.
-        Returns :
-            Signal2D :
-                A Scan2D object representing the B-scan.
+        Parameters
+        ----------
+        option : {'max', 'var', float} optional
+            Select the method to find the slice
+            * 'max': The maximum amplitude along the axis
+            * 'var': the maximum variance along the axis.
+            * scalar: A scalar can be specified to select a specific point along the axis
+
+        Returns
+        -------
+        : Signal2D
+            Extracted B-scan as a Signal2D object.
         """
-        if option == 'max':
-            s = self.apply(lambda x: x.max().max(), axis=(1, 2))
-        elif option == 'var':
-            s = self.apply(lambda x: x.var().var(), axis=(1, 2))
-        else:
-            raise ValueError('Unknown option.')
-        print(s.idxmax())
-        return self[s.idxmax()]
+        return self.extract(option, axis=0)
 
-    def dscan(self, depth='max'):
-        """
-        Convenience method that return b-scans for Ultrasound Testing raster scans.
-        Slices the raster scan along the Y-t axes (i.e. at a given X location).
-
-        Parameters:
-            - depth (float/sting, optional):
-                Select which slice to be used for the b-scan. If 'max', the
-                slice passing through the maximum point is selectd.
-        Returns:
-            Signal2D :
-                A Scan2D object representing the D-scan.
-        """
-        if depth == 'max':
-            idx = self.cscan().max(axis=0).idxmax()
-            return self.loc[:, :, idx]
-        else:
-            if depth > self.minor_axis.max() or depth < self.minor_axis.min():
-                raise ValueError('depth is outside range of scan in X-direction.')
-            # find the nearest X-coordinate near the given depth
-            ind = self.minor_axis[np.abs(self.minor_axis.values - depth).argmin()]
-            return self.loc[:, :, ind]
-
-    def cscan(self, depth='project', skew_angle=0, method='nearest', **kwargs):
+    def cscan(self, option='max'):
         """
         Computes C-scan image generally used for Ultrasound Testing. This collapses the
-        raster scan along the T direction, or takes a slice at a given T coordinate,
+        raster scan along the t direction, or takes a slice at a given t coordinate,
         resulting in an image spanning the X-Y axes.
 
-        Parameters:
-            depth (float/string, optional):
-                The methodology to obtain the C-scan. Supported options are:
-                'project' collapses the whole T-axis into a single value using the methodology
-                specified by the option parameter. 'max' obtains the
-                T-axis coordinate where the T-value is maximum. Otherwise depth
-                is a float value specifying the actual T-coordinate value.
+        Parameters
+        ----------
+        option:
+            See :meth:`Signal3D.bscan` documentation for supported options.
 
-            skew_angle (float, optional) :
-                Skews the X-direction to be aligned with the ultrasonic beam angle,
-                before projecting the T-axis onto the X-axis.
-
-        Returns:
-            Signal2D :
-                A Scan2D object representing the C-scan.
+        Returns
+        -------
+        : Signal2D
+            A Scan2D object representing the C-scan.
         """
-        if depth == 'project':
-            uskew = self.apply(lambda x: x.skew(skew_angle, axes=1, method=method, **kwargs),
-                               axis=(1, 2))
-            return uskew.std(axis=1).T
-        elif depth == 'max':
-            return self.abs().max(axis=1).T
-        else:
-            if depth > self.major_axis.max() or depth < self.major_axis.min():
-                raise ValueError('depth is outside range of scan in T-direction.')
-            # find the nearest T-coordinate near the given depth
-            ind = self.major_axis[np.abs(self.major_axis.values - depth).argmin()]
-            return self.loc[:, ind, :].T
+        return self.extract(option, axis=1).T
+
+    def skew(self, angle,  axis, skew_axes=1, start=None, stop=None, ts=None, **kwargs):
+        """
+        Applies a 2-D skew for each slice along a specified axis. Uses interpolation to
+        recalculate the signal values at the new coordinates.
+
+        Note
+        ----
+        This does not perform a 3-D skew and interpolation, but only a 2-D skew and
+        interpolation, along a specified 3rd axis.
+
+        Parameters
+        ----------
+        angle : float, 2-element array
+            The angle of the skew.
+
+        axis : {0/'y'/'items', 1/'t'/'major_axis', 2/'x'/'minor_axis'}
+            The axis along which to extract each slice to be skewed.
+
+        skew_axes: {0/'y'/'index', 1/'x'/'columns', None}, optional
+            Determine along which axis to apply the skew, after extracting the slice along the
+            specified *axis*. The axes domain is in that of :class:`Signal2D`.
+
+        start, stop, ts : See :meth:`Signal2D.skew()` for documentation on these arguments.
+
+        Returns
+        -------
+        : Signal3D
+            A copy of Signal3D after application of the skew.
+        """
+        other_ax = self._get_other_axes(axis)
+
+        # Make nearest neighbor the default interpolation method.
+        if 'method' not in kwargs:
+            kwargs['method'] = 'nearest'
+        return self.apply(lambda x: x.skew(angle, axes=skew_axes, start=start, stop=stop,
+                                           ts=ts, interpolate=True, **kwargs), axis=other_ax)
 
     def flatten(self):
         """
         Flatten an array and its corresponding indices.
 
-        Returns:
-            Y, T, X, values (tuple):
-                A 4-element tuple where each element is a flattened array of the Signal3D,
-                and each representing a point with coordinates Y, T, X and its value.
+        Returns
+        -------
+        x, t, x, values : numpy.ndarray
+            A 4-element tuple where each element is a flattened array of the Signal3D, and each
+            representing a point with coordinates y, t, x and its value.
         """
         yv, tv, xv = np.meshgrid(self.Y, self.t, self.X, indexing='xy')
         return np.array([yv.ravel(), tv.ravel(), xv.ravel(), self.values.ravel()])
 
     @property
     def axis(self):
+        """
+        Return the values of the three axes in the Signal3D.
+        """
         return self.items, self.major_axis, self.minor_axis
 
     @property
     def ts(self):
+        """
+        The mean sampling interval for each of the axes.
+        """
         return np.mean(np.diff(self.items)), np.mean(np.diff(self.major_axis)),\
                np.mean(np.diff(self.minor_axis))
 
-    # _______________________________________________________________________#
     @property
     def x(self):
         """ Convenience property to return X-axis coordinates as ndarray. """
         return self.minor_axis.values
 
-# _______________________________________________________________________#
     @property
     def y(self):
         """ Convenience property to return Y-axis coordinates as ndarray. """
         return self.items.values
 
-# _______________________________________________________________________#
     @property
     def z(self):
         """ Convenience property to return t-axis coordinates as ndarray. """

@@ -8,7 +8,6 @@ from . import peakutils
 from .signal2d import Signal2D
 
 
-# _____________________________________________________________ #
 class Signal(pd.Series):
     """
     Represents physical signals, by keeping track of the index (time/space) and corresponding
@@ -65,7 +64,6 @@ class Signal(pd.Series):
         """
         return Signal
 
-    # _____________________________________________________________ #
     def __call__(self, key=None, ts=None, **kwargs):
         """
         Make the Signal act like a function, where given index values are computed using an
@@ -80,7 +78,7 @@ class Signal(pd.Series):
            sequence of indices.
 
         ts : float, optional
-            *ts* can be specified only if *key* has not been specified. This will resample the
+            *ts* can be specified only if *key* has not been specified. This will re-sample the
             signal to the sample interval specified by *ts*.
 
         Returns
@@ -125,8 +123,8 @@ class Signal(pd.Series):
                                                             **self._interp_kwargs)
         return Signal(self._interp_fnc(key), index=key if hasattr(key, '__len__') else [key])
 
-    # _____________________________________________________________ #
-    def window(self, index1=None, index2=None, is_positional=False, win_fcn='hann', fftbins=False):
+    def window(self, index1=None, index2=None, is_positional=False, win_fcn='boxcar',
+               fftbins=False):
         """
         Applies a window to the signal within a given time range.
 
@@ -136,7 +134,7 @@ class Signal(pd.Series):
             The start index/position of the window. Default value is minimum of index.
 
         index2 : float or int, optional
-            The end index/position of the window. Defaul value is maximum of index.
+            The end index/position of the window. Default value is maximum of index.
 
         is_positional : bool, optional
             Indicates whether the inputs `index1` and `index2` are positional or value
@@ -179,7 +177,6 @@ class Signal(pd.Series):
             wind[-index2:-index1] = get_window(win_fcn, len(wind[-index2:-index1]))
         return self*wind
 
-    # _____________________________________________________________ #
     def normalize(self, option='max'):
         """
         Normalizes the signal according to a given option.
@@ -202,11 +199,74 @@ class Signal(pd.Series):
         if option == 'energy':
             return self/np.sqrt(self.energy())
         elif option == 'max':
-            return self/np.max(np.abs(self))
+            return self/np.max(np.abs(self.values))
         else:
             raise ValueError('Unknown option value.')
 
-    # _____________________________________________________________ #
+    def pad(self, extent, fill=0.0, position='split'):
+        """
+        Pad the signal with a given value to span a specified extent. If the extent is shorter
+        than the current signal length, the signal will be truncated.
+
+        Parameters
+        ----------
+        extent : float
+            The desired signal length in *index* units.
+
+        fill : {'edge', float}, optional
+            Value used to fill the padded signal. If specified as 'edge', then the signal will be
+            padded by the edge value of the signal. Thus padding to the right will pad with the
+            value of the last sample, and padding to the left will use the value of the first
+            sample.
+
+        position : {'split', 'left', 'right'}
+            How to fill the signal to span the required extent:
+                * 'split': The signal will be padded evenly from left and right. If the number of
+                  padded samples is odd, then right padding will be one sample more than left
+                  padding.
+                * 'left': Left (start) padding.
+                * 'right': Right (end) padding.
+
+        Returns
+        -------
+        : Signal
+            A new padded signal.
+
+        Note
+        ----
+            * If *extent* is not a multiple of the signal sampling rate, then the signal is
+              padded to span the next possible value after the specified *extent*.
+            * The original signal index will be kept intact, and no re-sampling will be made.
+        """
+        index_range = self.index.max() - self.index.min()
+        npad = int(np.ceil((extent - index_range) / self.ts))
+        npad_left, npad_right = npad, npad
+        if position == 'right':
+            npad_left = 0
+        elif position == 'left':
+            npad_right = 0
+        elif position == 'split':
+            npad_left, npad_right = int(np.floor(npad / 2)), int(np.ceil(npad / 2))
+        else:
+            raise ValueError('Unknown value for position.')
+
+        out = self
+        if npad_right != 0:
+            if npad_right > 0:
+                val = self.iloc[-1] if fill == 'edge' else fill
+                s = Signal(val, index=self.index[-1] + np.arange(1, npad_right + 1) * self.ts)
+                out = pd.concat((out, s))
+            else:
+                out = out.iloc[:npad_right]
+        if npad_left != 0:
+            if npad_left > 0:
+                val = self.iloc[0] if fill == 'edge' else fill
+                s = Signal(val, index=self.index[0] - np.arange(npad_left, 0, -1) * self.ts)
+                out = pd.concat((s, out))
+            else:
+                out = out.iloc[-npad_left:]
+        return Signal(out)
+
     def segment(self, thres, pulse_width, win_fcn='hann'):
         """
         Segments the signal into a collection of signals, with each item in the collection,
@@ -243,7 +303,6 @@ class Signal(pd.Series):
                              win_fcn=win_fcn) for i in peak_ind]
         return parts
 
-    # _____________________________________________________________ #
     def operate(self, option=''):
         """
         This is a convenience function for common operations on signals. Returns the signal
@@ -264,6 +323,11 @@ class Signal(pd.Series):
             +--------------------+--------------------------------------+
             | 'd'                | decibel value                        |
             +--------------------+--------------------------------------+
+
+        Returns
+        -------
+        : Signal
+            The new signal with the specified operation.
         """
         yout = self
         if 'e' in option:
@@ -274,7 +338,6 @@ class Signal(pd.Series):
             yout = 20*np.log10(np.abs(yout))
         return Signal(yout, index=self.index)
 
-    # _____________________________________________________________ #
     def fft(self, nfft=None, ssb=False):
         """
         Computes the Fast Fourier transform of the signal using :func:`scipy.fftpack.fft` function.
@@ -304,7 +367,6 @@ class Signal(pd.Series):
         uf = Signal(fftshift(fft(self, n=nfft)), index=fftshift(fftfreq(nfft, self.ts)))
         return uf[uf.index >= 0] if ssb else uf
 
-    # _____________________________________________________________ #
     def limits(self, threshold=-20):
         """
         Computes the index limits where the signal first goes above a given threshold,
@@ -335,7 +397,6 @@ class Signal(pd.Series):
             tout.append((threshold-y1)*(x2-x1)/(y2-y1) + x1)
         return tout[0], tout[1]
 
-    # _____________________________________________________________ #
     def tof(self, method='corr', *args):
         """
         Computes the time of flight relative to another signal. Three different methods for
@@ -360,8 +421,8 @@ class Signal(pd.Series):
 
         Returns
         -------
-            : float
-                The computed time of flight, with the same units as the Signal index.
+        : float
+            The computed time of flight, with the same units as the Signal index.
         """
         if method.lower() == 'corr':
             try:
@@ -383,7 +444,6 @@ class Signal(pd.Series):
         else:
             raise ValueError('method not supported. See documentation for supported methods.')
 
-    # _____________________________________________________________ #
     def spectrogram(self, width, overlap=0, **kwargs):
         """
         Computes the spectrogram (short-time Fourier transform) of the signal. This method uses
@@ -416,7 +476,6 @@ class Signal(pd.Series):
                               mode='magnitude', **kwargs)
         return Signal2D(S, index=f, columns=t)
 
-    # _____________________________________________________________ #
     def psd(self, width, overlap=0, **kwargs):
         """
         Computes the periodogram of the signal. This method uses the function
@@ -448,7 +507,6 @@ class Signal(pd.Series):
         f, pxx = welch(self.values, fs=self.fs, nperseg=nperseg, noverlap=nol, **kwargs)
         return Signal(pxx, index=f)
 
-    # _____________________________________________________________ #
     def coherence(self, other, width, overlap=0, **kwargs):
         """
         Compute the short-time correlation coefficient of the signal. Uses the function
@@ -478,7 +536,6 @@ class Signal(pd.Series):
                            **kwargs)
         return Signal(cxy, index=f)
 
-    # _____________________________________________________________ #
     def filter_freq(self, cutoff, option='lp', win_fcn='boxcar'):
         """
         Applies a frequency domain filter to the signal.
@@ -530,7 +587,6 @@ class Signal(pd.Series):
         fdomain = fdomain.window(index1=index1, index2=index2, win_fcn=win_fcn, fftbins=True)
         return Signal(np.real(ifft(fftshift(fdomain))), index=self.index)
 
-    # _____________________________________________________________ #
     def center_frequency(self, threshold=-6, nfft=None):
         """
         Computes the center frequency of the signal, which is the mean of the bandwidth limits.
@@ -558,7 +614,6 @@ class Signal(pd.Series):
         frequencies = yn[yn >= threshold].index
         return (frequencies.max() + frequencies.min())/2
 
-    # _____________________________________________________________ #
     def peak_frequency(self, threshold=-6, nfft=None):
         """
         Computes the peak frequency of the signal.
@@ -583,7 +638,6 @@ class Signal(pd.Series):
             raise ValueError("threshold should be dB value <= 0.")
         return self.fft(ssb=True, nfft=nfft).idxmax()
 
-    # _____________________________________________________________ #
     def bandwidth(self, threshold=-6, nfft=None):
         """
         Computes the bandwidth of the signal by finding the range of frequencies
@@ -612,7 +666,6 @@ class Signal(pd.Series):
         print(lims)
         return lims[1] - lims[0]
 
-    # _____________________________________________________________ #
     def maxof(self, option='peak'):
         """
         Computes the maximum of the signal according to a given method.
@@ -650,7 +703,6 @@ class Signal(pd.Series):
                              "'env', 'peak', or 'fft'.")
         return np.max(y.values)
 
-    # _____________________________________________________________ #
     def energy(self, option='abs'):
         """
         Computes the energy of the given waveform in the specified domain. Simpson's integration
@@ -680,7 +732,6 @@ class Signal(pd.Series):
         else:
             raise ValueError("The value for option is unknown. Should be either 'abs' or 'env'.")
 
-    # _____________________________________________________________ #
     def remove_mean(self):
         """
         Subtracts the mean of the signal.
@@ -692,19 +743,16 @@ class Signal(pd.Series):
         """
         return self - self.mean()
 
-    # _____________________________________________________________ #
     @property
     def ts(self):
         """ Get the signal sampling period. """
         return np.mean(np.diff(self.index[self.index >= 0]))
 
-    # _____________________________________________________________ #
     @property
     def extent(self):
         """ Get the signal index extent. """
         return self.index.max() - self.index.min()
 
-    # _____________________________________________________________ #
     @property
     def fs(self):
         """ Get the signal sampling frequency. """

@@ -2,10 +2,9 @@ import pandas as pd
 import numpy as np
 from scipy.signal import hilbert, get_window
 from scipy.interpolate import griddata
-from scipy.fftpack import fft2, fftfreq, fftshift
-import matplotlib.pyplot as plt
-from time import time
+from scipy.fftpack import fft2, fftfreq, fftshift, ifft
 from .signal3d import Signal3D
+from skimage.measure import regionprops
 
 
 class Signal2D(pd.DataFrame):
@@ -78,7 +77,6 @@ class Signal2D(pd.DataFrame):
     def _constructor_expanddim(self):
         return Signal3D
 
-    # _____________________________________________________________ #
     def __call__(self, index, columns, **kwargs):
         """
         Interpolate the axes. This function used :func:`scipy.interpolate.griddata`.
@@ -109,7 +107,6 @@ class Signal2D(pd.DataFrame):
         vals = griddata((yg.ravel(), xg.ravel()), self.values.ravel(), (index, columns), **kwargs)
         return Signal2D(vals, index=index, columns=columns)
 
-    # _____________________________________________________________ #
     def operate(self, option='', axis=0):
         """
         Returns the signal according to a given option.
@@ -251,43 +248,128 @@ class Signal2D(pd.DataFrame):
     def window(self, index1=None, index2=None, axes=None, is_positional=False, win_fcn='hann',
                fftbins=False):
         """
+        Applies a window to the signal within a given time range.
 
-        :param index1:
-        :param index2:
-        :param is_positional:
-        :param win_fcn:
-        :param fftbins:
-        :return:
+        Parameters
+        ----------
+        index1 : {float, int, array_like}, optional
+            The start index/position of the window. Default value is minimum of index and columns.
+            If *index1* is a two_element array, then it specifies the start positions for both axes.
+
+        index2 : {float, int, array_like}, optional
+            The end index/position of the window. Default value is maximum of index and columns.
+            If *index2* is a two_element array, then it specifies the end positions for both axes.
+
+        axes : {int, string, array_like}, optional
+            The axes names/numbers along which to apply the window.
+
+        is_positional : bool, optional
+            Indicates whether the inputs `index1` and `index2` are positional or index units
+            based. Default is :const:`False`, i.e. index units based.
+
+        win_fcn : string/float/tuple, optional
+            The type of window to create. See the function :func:`scipy.signal.get_window()` for
+            a complete list of available windows, and how to pass extra parameters for a
+            specific window function.
+
+        fftbins : bool, optional
+            If True, then applies a symmetric window with respect to index/columns of value 0.
+
+        Returns
+        -------
+        Signal:
+            The windowed Signal signal.
+
+        Note
+        ----
+          If the window requires no parameters, then `win_fcn` can be a string.
+          If the window requires parameters, then `win_fcn` must be a tuple
+          with the first argument the string name of the window, and the next
+          arguments the needed parameters. If `win_fcn` is a floating point
+          number, it is interpreted as the beta parameter of the kaiser window.
         """
-        wind = Signal2D(0, index=self.index, columns=self.columns)
-
         indices = [index1, index2]
         for i in [0, -1]:
-            if not is_positional:
-                indices[i] = self.index.get_loc(self.self.ndices[i][0], method='nearest')
-            indices[i] = self._set_val_on_axes(indices[i], axes, [i, i])
+            if is_positional:
+                indices[i] = self._set_val_on_axes(indices[i], axes, [i, i])
+                indices[i] = [self.index[indices[i][0]], self.columns[indices[i][1]]]
+            else:
+                indices[i] = self._set_val_on_axes(indices[i], axes, [self.index[i],
+                                                                      self.columns[i]])
+        win2d = Signal2D(0, index=self.index, columns=self.columns)
 
-
-            window1 = get_window(win_fcn, wind.loc[index1[0]:index2[0]].shape[0])
-
-        window2 = get_window(win_fcn, wind.loc[:, index1[1]:index2[1]].shape[1])
-        wind.loc[index1[0]:index2[0], index1[1]:index2[1]] = np.sqrt(np.outer(window1, window2))
+        win1 = get_window(win_fcn, win2d.loc[indices[0][0]:indices[1][0]].shape[0])
+        win2 = get_window(win_fcn, win2d.loc[:, indices[0][1]:indices[1][1]].shape[1])
+        win = np.sqrt(np.outer(win1, win2))
+        win2d.loc[indices[0][0]:indices[1][0], indices[0][1]:indices[1][1]] = win
 
         if fftbins:
-            if wind[-index2:-index1].size == 0:
-                raise IndexError('The signal does not have values at the negative of the indices '
+            axes = self._make_axes_as_num(axes)
+            if 0 in axes:
+                ax0_ind = self.index[(self.index.values >= -indices[1][0]) &
+                                     (self.index.values <= -indices[0][0])]
+            else:
+                ax0_ind = self.index
+            if 1 in axes:
+                ax1_ind = self.columns[(self.columns.values >= -indices[1][1]) &
+                                       (self.solumns.values <= -indices[0][1])]
+            else:
+                ax1_ind = self.columns
+
+            if len(ax0_ind) == 0 or len(ax1_ind) == 0:
+                raise IndexError('The Signal2d does not have values at the negative of the indices '
                                  'supplied. Disable fftbins for one-sided windowing.')
-            wind[-index2:-index1] = get_window(win_fcn, len(wind[-index2:-index1]))
-        return self*wind
+            win2d.loc[ax0_ind, ax1_ind] = win
+        return self*win2d
 
-    def filter_freq(self, cutoff, option='bp'):
+    def filter_freq(self, cutoff, axes=None, option='bp', win_fcn='boxcar'):
         """
+        Applies a filter in the frequency domain.
 
-        :param cutoff:
-        :param option:
-        :return:
+        Parameters
+        ----------
+        cutoff : {scalar, array_like}
+            The frequency cutoff of the filter. If *option* is set to 'bp', then this should be a
+            two element array indicating the lower and upper cutoff frequencies.
+
+        axes : {int, string}, optional
+            The axes along which to filter the 2D signal.
+
+        option : {'lp', 'hp', 'bp'}, optional
+            The type opf filter to apply:
+                * 'lp' : Low pass filter
+                * 'hp' : High pass filter
+                * 'bp' : Band pass filter
+
+        win_fcn : {string, tuple}, optional
+            The window type to apply for performing the filtering in the frequency domain. See the
+            function :func:`scipy.signal.get_window()` for a complete list of available windows,
+            and how to pass extra parameters for a specific window function.
+
+        Returns
+        -------
+        : Signal2D
+            The new filtered signal.
         """
-        fval = self.fft()
+        if hasattr(cutoff, '__len__'):
+            cutoff = np.array(cutoff)
+
+        fdomain = self.fft(axes=axes)
+        start = [0, 0]
+        end = [fdomain.index.max(), fdomain.columns.max()]
+
+        if option == 'lp':
+            end = self._set_val_on_axes(cutoff, axes, end)
+        elif option == 'hp':
+            start = self._set_val_on_axes(cutoff, axes, start)
+        elif option == 'bp':
+            start = self._set_val_on_axes(cutoff[0], axes, start)
+            end = self._set_val_on_axes(cutoff[1], axes, end)
+        else:
+            raise ValueError('The value for type is not recognized.')
+
+        fdomain = fdomain.window(index1=start, index2=end, win_fcn=win_fcn, fftbins=True)
+        return Signal2D(np.real(ifft(fftshift(fdomain, axes=axes), axis=axes)), index=self.index)
 
     def shift_axes(self, shift, axes=None):
         """
@@ -306,13 +388,12 @@ class Signal2D(pd.DataFrame):
 
         Returns
         -------
-        Signal2D:
+        : Signal2D
             A new Signal2D with shifted axes.
         """
         shift = self._set_val_on_axes(shift, axes, [0, 0])
         return Signal2D(self.values, index=self.index-shift[0], columns=self.columns-shift[1])
 
-    # _____________________________________________________________ #
     def scale_axes(self, scale, start=None, stop=None, axes=None):
         """
         Scales a given axis (or both) by a given amount.
@@ -363,7 +444,6 @@ class Signal2D(pd.DataFrame):
         newcol[(newcol >= start[1]) & (newcol <= stop[1])] *= scale[1]
         return Signal2D(self.values, index=newindex, columns=newcol)
 
-    # _____________________________________________________________ #
     def skew(self, angle, axes=1, start=None, stop=None, ts=None, interpolate=True, **kwargs):
         """
         Applies a skew transformation on the data.
@@ -375,8 +455,8 @@ class Signal2D(pd.DataFrame):
             is scalar, then a skew is applied on both axes with the same angle.
 
         axes : integer, str, optional
-            The axis along which to skew. to skew the image horizontally, axis can be 0, 'y',
-            or 'index. To skew the image vertically, it can be 1, 'x', or 'columns'. If axis is
+            The axis along which to skew. to skew the image vertically, axis can be 0, 'y',
+            or 'index. To skew the image horizontally, it can be 1, 'x', or 'columns'. If axis is
             set to None, then both axes are skewed.
 
         start : float, array_like, optional
@@ -460,208 +540,148 @@ class Signal2D(pd.DataFrame):
         else:
             return x, y
 
-    def flip(self, axis):
+    def flip(self, axes=None):
         """
-        Flips the values of the uFrame without flipping corresponding X/Y-axes coordinates.
+        Flips the values without flipping corresponding X/Y-axes coordinates.
 
-        Parameters:
-            axis (int/string) :
-                The axis along which to flip the values. Options are 0/'Y'/'index' or 1/'X'/columns
+        Parameters
+        ----------
+        axes : int/string, optional
+            The axis along which to flip the values. axis can be 0/'y'/'index'. or 1/'x'/'columns'.
+            If axis is set to :const:`None`, both axes will be flipped.
 
-        Returns:
-            Signal2D :
-                New uFrame with axis flipped.
+        Returns
+        --------
+        : Signal2D
+            A copy of Signal2D with axis flipped.
         """
-        if axis == 'Y' or axis == 0 or axis == 'index':
-            return Signal2D(self.values[::-1, :], index=self.index, columns=self.columns)
-        elif axis == 'X' or axis == 1 or axis == 'columns':
-            return Signal2D(self.values[:, ::-1], index=self.index, columns=self.columns)
-        else:
-            raise ValueError('Unknown axis value. Shoud be 0/\'Y\'/\'index\'' +
-                             'or 1/\'X\'/\'columns\'')
+        axes = self._make_axes_as_num(axes)
+        vals = self.values
+        if 0 in axes:
+            vals = vals[::-1, :]
+        if 1 in axes:
+            vals = vals[:, ::-1]
+        return Signal2D(vals, index=self.index, columns=self.columns)
 
-    # _____________________________________________________________ #
-    def roll(self, value, axis=None):
+    def roll(self, value, axes=None):
         """
-        Circular shift of the uFrame by a given value, along a given axis.
+        Circular shift by a given value, along a given axis.
 
-        Parameters:
-            value (float) :
-                The amount (in X-Y coordinates units) by which to shift the uFrame.
+        Parameters
+        ----------
+        value : float
+            The amount (in X-Y coordinates units) to shift.
 
-            axis (string/int, optional):
-                The axis along which to shift the uFrame. Options are 0/'Y'/'index'
-                or 1/'X'/columns. By default, the uFrame is
-                flattened before shifting, after which the original shape is restored.
-                See numpy.roll for more information.
+        axes : string/int, optional
+            The axis along which to shift. Options are 0/'Y'/'index' or 1/'X'/columns. By default,
+            the uFrame is flattened before shifting, after which the original shape is restored.
+            See numpy.roll for more information.
 
-        Returns:
-            Signal2D :
-                The new circularly shifted uFrame.
+        Returns
+        -------
+        : Signal2D
+            A copy of Signal2D after applying the circular shift.
         """
-        indexes = int(np.around(value/self.Xs[axis]))
-        return self._constructor(np.roll(self, indexes, axis), index=self.index,
-                                 columns=self.columns)
+        axes = self._make_axes_as_num(axes)
+        value = self._set_val_on_axes(value, axes, [0., 0.])
+        out_val = self.values
+        for ax in axes:
+            indexes = int(np.around(value/self.ts[ax]))
+            out_val = np.roll(out_val, indexes, ax)
+        return Signal2D(out_val, index=self.index, columns=self.columns)
 
-    # _____________________________________________________________ #
-    def centroid(self):
-        """
-        Computes the centroid of the image corresponding to the dataframe.
-
-        Returns:
-            Cx, Cy ((2,) tuple) :
-                The X-coordinate, Y-coordinate of the centeroid location.
-        """
-        Ax, Ay = self.sum('index'), self.sum('columns')
-        norm1 = Ax.sum()
-        Cx = np.dot(self.columns.values, Ax.values)/norm1
-        Cy = np.dot(self.index.values, Ay.values)/norm1
-        return Cx, Cy
-
-    # _____________________________________________________________ #
-    def center(self, axis=None):
-        """
-        Move the centroid of the uFrame to the coordinates center. This will result in a
-        circularly shifted uFrame.
-
-        Parameters:
-            axis (string/int, optional) :
-                The axis along which to center the uFrame.
-                Options are 0/'Y'/'index' or 1/'X'/columns. By default, uFrame is centered
-                on both axes.
-
-        Returns:
-            Signal2D :
-                The centered uFrame.
-        """
-        Cx, Cy = self.centroid()
-        if axis == 1 or axis == 'X' or axis == 'columns' or axis is None:
-            out = self.roll(np.mean(self.X) - Cx, axis=1)
-        if axis == 0 or axis == 'Y' or axis == 'index' or axis is None:
-            out = out.roll(np.mean(self.Y) - Cy, axis=0)
-        return out
-
-    # _____________________________________________________________ #
     def max_point(self):
         """
-        Gets the X/Y coordinates of the maximum point.
+        Gets the (x, y) coordinates of the points that has the maximum amplitude.
 
-        Returns:
-            X, Y ((2,) tuple) :
-                The X, Y coordinates of the Signal2D maximum.
+        Returns
+        -------
+        x, y : ((2,) tuple)
+            The (x, y) coordinates of the Signal2D maximum amplitude.
         """
-        X = self.max(0).idxmax()
-        Y = self.loc[:, X].idxmax()
-        return X, Y
+        x = self.max(0).idxmax()
+        y = self.loc[:, x].idxmax()
+        return x, y
 
-    # _____________________________________________________________ #
-    def flatten(self, skew_angle=0):
+    def flatten(self):
         """
         Flattens the Signal2D to give coordinates (X, Y, Values).
 
-        Parameters:
-            skew_angle (float, optional) :
-                Angle (in degrees) to skew the X-Y coordinates before flattening.
-                For example, this is used to generate True B-scan coordinates along
-                the ultrasound beam angle.
-
-        Returns:
-            X, Y, Z (tuple) :
-                The X-coordinates, Y-coordinates, Values of the Signal2D.
+        Returns
+        -------
+        x, y, z : numpy.ndarray
+            The X-coordinates, Y-coordinates, Values of the Signal2D.
         """
-        XV, YV = self.meshgrid(skew_angle=skew_angle)
-        return np.array([XV.ravel(), YV.ravel(), self.values.ravel()])
+        xv, yv = np.meshgrid(self.columns, self.index, indexing='xy')
+        return np.array([xv.ravel(), yv.ravel(), self.values.ravel()])
 
-    # _____________________________________________________________ #
-    def meshgrid(self, indexing='xy', skew_angle=0):
+    def remove_mean(self, axes=None):
         """
-        Gives a meshgrid of the Signal2D coordinates.
+        Removes the mean along a given axis.
 
-        Parameters:
-            indexing ({'xy', 'ij'}, optional) :
-                Indexing of the output. There is not reason
-                to change this in the context of this libary. See numpy.meshgrid for
-                more information.
+        Parameters
+        ----------
+        axes : string/int, optional:
+            The axis along  which to remove the means. If axis not specified, remove the global
+            mean from the uFrame.
 
-            skew_angle (float, optional) :
-                Angle (in degrees) to skew the X-Y coordinates. For example, this is used to
-                generate True B-scan coordinates along the ultrasound beam angle.
-
-        Returns:
-            X, Y (ndarray) :
-                The meshgrids for the X-coordinates and Y-coordinates.
+        Returns
+        -------
+        : Signal2D
+            A copy of signal2D with means subtracted along given axes.
         """
-        X, Y = np.meshgrid(self.X, self.Y, indexing=indexing)
-        X += Y*np.sin(np.deg2rad(-1*skew_angle))
-        Y = Y*np.cos(np.deg2rad(-1*skew_angle))
-        return X, Y
+        axes = self._make_axes_as_num(axes)
+        out = self.copy()
+        for ax in axes:
+            out = out - self.mean(axis=ax)
+        return out
 
-    # _____________________________________________________________ #
-    def remove_mean(self, axis=None):
+    def extract(self, axis=1, option='max'):
         """
-        Removes the mean of the uFrame along a given axis.
+        Extracts a 1-D Signal depending on the given option.
 
-        Parameters:
-            axis (string/int, optional):
-                The axis along  which to remove the means. If axis not specified, remove the global
-                mean from the uFrame.
+        Parameters
+        ----------
+        axis : int, optional
+            Axis along which to extract the :class:`Signal`. Options are 0/'y'/'index' or
+            1/'x'/'columns'.
 
-        Returns:
-            Signal2D :
-                New uFrame with means subtracted along given axis.
-        """
-        if axis is None:
-            return self - self.mean().mean()
-        if axis == 'Y' or axis == 'index' or axis == 0:
-            return self - self.mean(axis=0)
-        elif axis == 'X' or axis == 'columns' or axis == 1:
-            return (self.T - self.mean(axis=1)).T
+        option : {'max'}, optional
+            Currently only the option ``max`` is supported. This returns the signal at the
+            maximum point in the Signal2D.
 
-    # _____________________________________________________________ #
-    def series(self, axis=1, option='max'):
-        """
-        Extracts a series depending on the given option.
-
-        Parameters:
-            axis (int, optional) :
-                Axis along which to extract the :class:`Signal`. Options are 0/'Y'/'index'
-                or 1/'X'/'columns'.
-
-            option (string, optional) : Currently only the option ``max`` is supported. This
-                returns the signal at the maximum point in the Signal2D.
-
-        Returns:
-            Signal:
-                A new :class:`Signal` object representing the extracted signal.
+        Returns
+        -------
+        : Signal
+            A new :class:`Signal` object representing the extracted signal.
 
         """
+        axis = self._make_axes_as_num(axis)
+        if len(axis) > 1:
+            raise ValueError('axis cannot be None, or an array.')
         if option.lower() == 'max':
-            X, Y = self.max_point()
-            if axis == 0 or axis == 'Y' or axis == 'index':
-                return self.loc[Y, :]
-            elif axis == 1 or axis == 'X' or axis == 'columns':
-                return self.loc[:, X]
-            else:
-                raise ValueError('Unknwon axis. Options are 0/\'Y\'/\'index\'' +
-                                 'or 1/\'X\'/columns or None.')
+            x, y = self.max_point()
+            if 0 in axis == 0:
+                return self.loc[y, :]
+            elif 1 in axis:
+                return self.loc[:, x]
+        raise ValueError('Unknown axis value.')
 
-    # _____________________________________________________________ #
     @property
     def ts(self):
         """ Get the signal sampling period. """
         return np.mean(np.diff(self.index)), np.mean(np.diff(self.columns))
 
-    # _____________________________________________________________ #
     @property
     def x(self):
         """ Convenience property to return X-axis coordinates as ndarray. """
         return self.axes[1]
 
-    # _____________________________________________________________ #
     @property
     def y(self):
         """ Convenience property to return Y-axis coordinates as ndarray. """
         return self.axes[0]
 
+
 Signal2D._setup_axes(['index', 'columns'], info_axis=1, stat_axis=0,
-                      axes_are_reversed=True, aliases={'rows': 0, 'y': 0, 'x': 1})
+                     axes_are_reversed=True, aliases={'rows': 0, 'y': 0, 'x': 1})

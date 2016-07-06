@@ -217,3 +217,42 @@ class TestSignal2D(unittest.TestCase):
 
         s = s.window(index1=2, index2=4, axes=0, is_positional=True, win_fcn='boxcar')
         pdt.assert_frame_equal(s, swindowed)
+
+    def test_window_ispositional2(self):
+        t = np.arange(6) * 1e-6
+        x = np.arange(6) * 1e-3
+
+        s = Signal2D(np.ones((6, 6)), index=t, columns=x)
+        swindowed = Signal2D([[0., 0., 0., 0., 0., 0.],
+                              [0., 0., 0., 0., 0., 0.],
+                              [0., 0., 0., 1., 1., 1.],
+                              [0., 0., 0., 1., 1., 1.],
+                              [0., 0., 0., 1., 1., 1.],
+                              [0., 0., 0., 0., 0., 0.]], index=t, columns=x)
+
+        s = s.window(index1=[2, 3], index2=[4, 5], is_positional=True, win_fcn='boxcar')
+        pdt.assert_frame_equal(s, swindowed)
+
+    def test_window_fftbins(self):
+        t = np.arange(7) * 1e-6 - 3e-6
+        x = np.arange(6) * 1e-3
+
+        s = Signal2D(np.ones((7, 6)), index=t, columns=x)
+
+        swindowed = Signal2D([[0., 0., 0., 0., 0., 0.],
+                              [1., 1., 1., 1., 1., 1.],
+                              [1., 1., 1., 1., 1., 1.],
+                              [0., 0., 0., 0., 0., 0.],
+                              [1., 1., 1., 1., 1., 1.],
+                              [1., 1., 1., 1., 1., 1.],
+                              [0., 0., 0., 0., 0., 0.]], index=t, columns=x)
+
+        s = s.window(index1=0.9e-6, index2=2.1e-6, axes=0, fftbins=True, win_fcn='boxcar')
+        pdt.assert_frame_equal(s, swindowed)
+
+    def test_window_fftbins2(self):
+        t = np.arange(7) * 1e-6
+        x = np.arange(6) * 1e-3
+        s = Signal2D(np.ones((7, 6)), index=t, columns=x)
+        self.assertRaises(IndexError, s.window, index1=0.9e-6, index2=2.1e-6, axes=0,
+                          fftbins=True, win_fcn='boxcar')

@@ -104,8 +104,34 @@ class TestSignal(unittest.TestCase):
     def test_normalize_raisesexception(self):
         self.assertRaises(Exception, Signal().normalize, 'foo')
 
+    def test_pad_right(self):
+        s = Signal([0.1, 0.2, 0.3], index=[1e-6, 2e-6, 3e-6])
+        sp = Signal([0.1, 0.2, 0.3, 0.0, 0.0], index=[1e-6, 2e-6, 3e-6, 4e-6, 5e-6])
+        pdt.assert_series_equal(s.pad(4e-6, fill=0.0, position='right'), sp)
+
+    def test_pad_left(self):
+        s = Signal([0.1, 0.2, 0.3], index=[1e-6, 2e-6, 3e-6])
+        sp = Signal([0.0, 0.0, 0.1, 0.2, 0.3], index=[-1e-6, 0.0, 1e-6, 2e-6, 3e-6])
+        pdt.assert_series_equal(s.pad(4e-6, fill=0.0, position='left'), sp)
+
+    def test_pad_split(self):
+        s = Signal([0.1, 0.2, 0.3], index=[1e-6, 2e-6, 3e-6])
+        sp = Signal([0.0, 0.1, 0.2, 0.3, 0.0], index=[0.0, 1e-6, 2e-6, 3e-6, 4e-6])
+        pdt.assert_series_equal(s.pad(4e-6, fill=0.0, position='split'), sp)
+
+    def test_pad_split2(self):
+        s = Signal([0.1, 0.2, 0.3], index=[1e-6, 2e-6, 3e-6])
+        sp = Signal([0.0, 0.1, 0.2, 0.3, 0.0, 0.0], index=[0.0, 1e-6, 2e-6, 3e-6, 4e-6, 5e-6])
+        pdt.assert_series_equal(s.pad(5e-6, fill=0.0, position='split'), sp)
+
+    def test_pad_fill_as_edge(self):
+        s = Signal([0.1, 0.2, 0.3], index=[1e-6, 2e-6, 3e-6])
+        sp = Signal([0.1, 0.1, 0.2, 0.3, 0.3, 0.3], index=[0.0, 1e-6, 2e-6, 3e-6, 4e-6, 5e-6])
+        pdt.assert_series_equal(s.pad(5e-6, fill='edge', position='split'), sp)
+
     def test_segment(self):
         pass
+
 
 
 if __name__ == '__main__':
