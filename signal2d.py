@@ -2,9 +2,8 @@ import pandas as pd
 import numpy as np
 from scipy.signal import hilbert, get_window
 from scipy.interpolate import griddata
-from scipy.fftpack import fft2, fftfreq, fftshift, ifft
+from scipy.fftpack import fft2, fftfreq, fftshift, ifft2
 from .signal3d import Signal3D
-from skimage.measure import regionprops
 
 
 class Signal2D(pd.DataFrame):
@@ -104,8 +103,33 @@ class Signal2D(pd.DataFrame):
             raise TypeError('New index and columns must be one dimensional arrays.')
 
         xg, yg = np.meshgrid(self.columns, self.index, indexing='xy')
-        vals = griddata((yg.ravel(), xg.ravel()), self.values.ravel(), (index, columns), **kwargs)
+        new_xg, new_yg = np.meshgrid(columns, index, indexing='xy')
+        vals = griddata((yg.ravel(), xg.ravel()), self.values.ravel(), (new_yg, new_xg), **kwargs)
         return Signal2D(vals, index=index, columns=columns)
+
+    def reset_rate(self, ts, axes=None, **kwargs):
+        """
+        Re-samples the Signal to be of a specified sampling rate. The method uses interpolation
+        to recompute the signal values at the new samples.
+
+        Parameters
+        ----------
+        ts : float, array_like (2,)
+            The sampling rate for the axes specified. If it is a scalar, and axes is
+            :const:`None`, the same sampling rate will be set for both axes.
+
+        axes : {0/'y'/'index', 1/'x'/'columns'}, optional
+            The axes along which to apply the re-sampling. If it is not set, both axes will be
+            re-sampled.
+
+        Returns
+        -------
+        : Signal2D
+            A copy of the Signal2D with the new sampling rate.
+        """
+        ts = self._set_val_on_axes(ts, axes, self.ts)
+        indices = [np.arange(self.axes[i][0], self.axes[i][-1], ts[i]) for i in range(2)]
+        return self(index=indices[0], columns=indices[1], **kwargs)
 
     def operate(self, option='', axis=0):
         """
@@ -233,7 +257,8 @@ class Signal2D(pd.DataFrame):
         Keyword arguments can be given to the the underlying Fourier transform function
         :func:`scipy.fftpack.fft2`.
         """
-        fval = fftshift(fft2(self.values, axes, **kwargs), axes=axes)
+        axes = self._make_axes_as_num(axes)
+        fval = fftshift(fft2(self.values, axes=axes, **kwargs), axes=axes)
         coords = [self.axes[i].values for i in range(self.ndim)]
         for ax in axes:
             coords[ax] = fftshift(fftfreq(coords[ax].size, self.ts[ax]))
@@ -312,7 +337,7 @@ class Signal2D(pd.DataFrame):
                 ax0_ind = self.index
             if 1 in axes:
                 ax1_ind = self.columns[(self.columns.values >= -indices[1][1]) &
-                                       (self.solumns.values <= -indices[0][1])]
+                                       (self.columns.values <= -indices[0][1])]
             else:
                 ax1_ind = self.columns
 
@@ -322,24 +347,24 @@ class Signal2D(pd.DataFrame):
             win2d.loc[ax0_ind, ax1_ind] = win
         return self*win2d
 
-    def filter_freq(self, cutoff, axes=None, option='bp', win_fcn='boxcar'):
+    def filter_freq(self, low_freq=None, high_freq=None, axes=None, win_fcn='boxcar'):
         """
         Applies a filter in the frequency domain.
 
         Parameters
         ----------
-        cutoff : {scalar, array_like}
-            The frequency cutoff of the filter. If *option* is set to 'bp', then this should be a
-            two element array indicating the lower and upper cutoff frequencies.
+        low_freq : scalar, array_like, optional
+            The lower cutoff frequency for the filter. All frequencies less than this will be
+            filtered out. If this is scalar, and *axes* is :const:`None`, then the same
+            low_frequency will be applied for both axes.
+
+        high_freq : scalar, array_like, optional
+            The upper cutoff frequency for the filter. All frequencies higher than this will be
+            filtered out. If this is scalar, and *axes* is :const:`None`, then the same
+            high_frequency will be applied for both axes.
 
         axes : {int, string}, optional
             The axes along which to filter the 2D signal.
-
-        option : {'lp', 'hp', 'bp'}, optional
-            The type opf filter to apply:
-                * 'lp' : Low pass filter
-                * 'hp' : High pass filter
-                * 'bp' : Band pass filter
 
         win_fcn : {string, tuple}, optional
             The window type to apply for performing the filtering in the frequency domain. See the
@@ -351,25 +376,16 @@ class Signal2D(pd.DataFrame):
         : Signal2D
             The new filtered signal.
         """
-        if hasattr(cutoff, '__len__'):
-            cutoff = np.array(cutoff)
-
+        axes = self._make_axes_as_num(axes)
         fdomain = self.fft(axes=axes)
-        start = [0, 0]
-        end = [fdomain.index.max(), fdomain.columns.max()]
-
-        if option == 'lp':
-            end = self._set_val_on_axes(cutoff, axes, end)
-        elif option == 'hp':
-            start = self._set_val_on_axes(cutoff, axes, start)
-        elif option == 'bp':
-            start = self._set_val_on_axes(cutoff[0], axes, start)
-            end = self._set_val_on_axes(cutoff[1], axes, end)
-        else:
-            raise ValueError('The value for type is not recognized.')
-
-        fdomain = fdomain.window(index1=start, index2=end, win_fcn=win_fcn, fftbins=True)
-        return Signal2D(np.real(ifft(fftshift(fdomain, axes=axes), axis=axes)), index=self.index)
+        low_freq = self._set_val_on_axes(low_freq, axes, [0.0, 0.0])
+        high_freq = self._set_val_on_axes(high_freq, axes, [fdomain.index.max(),
+                                                            fdomain.columns.max()])
+        fdomain = fdomain.window(index1=low_freq, index2=high_freq, axes=axes, win_fcn=win_fcn,
+                                 fftbins=True)
+        vals = fftshift(fdomain.values, axes=axes)
+        ift = ifft2(vals, axes=axes)
+        return Signal2D(np.real(ift), index=self.index, columns=self.columns)
 
     def shift_axes(self, shift, axes=None):
         """
@@ -540,6 +556,70 @@ class Signal2D(pd.DataFrame):
         else:
             return x, y
 
+    def pad(self, extent, axes, fill=0.0, position='split'):
+        """
+        Adds padding along the given axes.
+
+        Parameters
+        ----------
+        extent : scalar, 2-element array
+            The desired extent of the axis that requires padding. If the given extent is smaller
+            than the current axis extent, the signal2D will be truncated.
+
+        axes : {0/'y'/index or 1/'x'/'columns, None}
+            The axes along which to apply the padding. If :const:`None` is specified, then the
+            Signal2D will be padded along both axes.
+
+        fill : {'min', 'max', scalar}, optional
+            The value to fill the padded regions:
+                * 'min': Pad with values of the minimum amplitude in the signal.
+                * 'max': Pad with the value of the maximum amplitude in the signal.
+                * scalar: otherwise, a custom scalar value can be specified for the padding.
+
+        position : {'start', 'end', 'split'}
+            How to apply the padding to the Signal2D:
+                * 'start' : apply the padding at the beginning of the axes. i.e., to the left for
+                  the columns, and to the top for the index.
+                * 'end' : apply the padding at the end of the axes.
+                * 'split': split the padding to be half at the start and half at the end. If the
+                  number of samples padded is odd, then the end will have one more sample padded
+                  than the start.
+
+        Returns
+        -------
+        : Signal2D
+            A new Signal2D object will the axes padded. The sampling interval of the padded
+            region is equal to the mean sampling rate of the corresponding axis.
+
+        """
+        extent = self._set_val_on_axes(extent, axes, self.extent)
+        npad = np.array([int(np.ceil((extent[i] - self.extent[i]) / self.ts[i])) for i in [0, 1]])
+        npad_start, npad_end = npad, npad
+        if position == 'end':
+            npad_start = [0, 0]
+        elif position == 'start':
+            npad_end = [0, 0]
+        elif position == 'split':
+            npad_start, npad_end = np.floor(npad / 2), np.ceil(npad / 2)
+        else:
+            raise ValueError('Unknown value for position.')
+
+        ax = []
+        for i in [0, 1]:
+            if npad_end[i] >= 0 and npad_start[i] >= 0:
+                ax.append(np.concatenate((self.axes[i].values[0] - np.arange(npad_start[i], 0,
+                                                                             -1) * self.ts[i],
+                                          self.axes[i].values,
+                                          self.axes[i].values[-1] + np.arange(1, npad_end[i]+1)
+                                          * self.ts[i])))
+            else:
+                ax.append(self.axes[i][-npad_start[i]:npad_end[i]])
+        if fill == 'min':
+            fill = self.min().min()
+        elif fill == 'max':
+            fill = self.max().max()
+        return self.reindex(index=ax[0], columns=ax[1], fill_value=fill)
+
     def flip(self, axes=None):
         """
         Flips the values without flipping corresponding X/Y-axes coordinates.
@@ -662,10 +742,17 @@ class Signal2D(pd.DataFrame):
         if option.lower() == 'max':
             x, y = self.max_point()
             if 0 in axis == 0:
-                return self.loc[y, :]
+                out = self.loc[y, :]
+                coord = y
             elif 1 in axis:
-                return self.loc[:, x]
-        raise ValueError('Unknown axis value.')
+                out = self.loc[:, x]
+                coord = x
+            else:
+                raise ValueError('Unknown axis value.')
+        else:
+            raise ValueError('Unknown option value.')
+
+        return coord, out
 
     @property
     def ts(self):
@@ -681,6 +768,11 @@ class Signal2D(pd.DataFrame):
     def y(self):
         """ Convenience property to return Y-axis coordinates as ndarray. """
         return self.axes[0]
+
+    @property
+    def extent(self):
+        """ Returns the extents of the axes values"""
+        return self.index.max() - self.index.min(), self.columns.max() - self.columns.min()
 
 
 Signal2D._setup_axes(['index', 'columns'], info_axis=1, stat_axis=0,

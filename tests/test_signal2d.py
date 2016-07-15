@@ -256,3 +256,26 @@ class TestSignal2D(unittest.TestCase):
         s = Signal2D(np.ones((7, 6)), index=t, columns=x)
         self.assertRaises(IndexError, s.window, index1=0.9e-6, index2=2.1e-6, axes=0,
                           fftbins=True, win_fcn='boxcar')
+
+    def test_pad_oneaxis(self):
+        t = np.arange(4) * 1e-6
+        x = np.arange(3) * 1e-3
+        s = Signal2D(np.ones((4, 3)), index=t, columns=x)
+
+        spadded = Signal2D([[1., 1., 1., 0., 0., 0., 0.],
+                            [1., 1., 1., 0., 0., 0., 0.],
+                            [1., 1., 1., 0., 0., 0., 0.],
+                            [1., 1., 1., 0., 0., 0., 0.]], index=t, columns=np.arange(7)*1e-3)
+        pdt.assert_frame_equal(s.pad(6e-3, axes=1, fill=0., position='end'), spadded)
+
+    def test_pad_oneaxis2(self):
+        t = np.arange(4) * 1e-6
+        x = np.arange(3) * 1e-3
+        s = Signal2D(np.ones((4, 3)), index=t, columns=x)
+
+        spadded = Signal2D([[0., 0., 0., 0., 1., 1., 1.],
+                            [0., 0., 0., 0., 1., 1., 1.],
+                            [0., 0., 0., 0., 1., 1., 1.],
+                            [0., 0., 0., 0., 1., 1., 1.]],
+                           index=t, columns=np.arange(7)*1e-3-4e-3)
+        pdt.assert_frame_equal(s.pad(6e-3, axes=1, fill=0., position='start'), spadded)

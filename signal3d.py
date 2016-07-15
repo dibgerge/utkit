@@ -55,6 +55,7 @@ class Signal3D(pd.Panel):
         : Signal3D
             The modified Signal3D.
         """
+        axis = self._make_axis_as_num(axis)
         yout = self
         if 'e' in option:
             yout = np.abs(hilbert(yout, axis=axis))
@@ -257,13 +258,16 @@ class Signal3D(pd.Panel):
             s = self.apply(lambda x: x.var().var(), axis=other_axes)
             option = s.idxmax()
 
-        if 0 in axis:
-            return self.loc[option]
-        elif 1 in axis:
-            return self.loc[:, option, :]
-        elif 2 in axis:
-            return self.loc[:, :, option]
-        raise ValueError('Unknown axis value.')
+        if axis == 0:
+            out = self.loc[option]
+        elif axis == 1:
+            out = self.loc[:, option, :]
+        elif axis == 2:
+            out = self.loc[:, :, option]
+        else:
+            raise ValueError('Unknown axis value.')
+
+        return option, out
 
     def dscan(self, option='max'):
         """
@@ -305,7 +309,7 @@ class Signal3D(pd.Panel):
         """
         return self.extract(option, axis=0)
 
-    def cscan(self, option='max'):
+    def cscan(self, option='max', skew_angle=None, start=None, stop=None, ts=None, **kwargs):
         """
         Computes C-scan image generally used for Ultrasound Testing. This collapses the
         raster scan along the t direction, or takes a slice at a given t coordinate,
@@ -316,12 +320,30 @@ class Signal3D(pd.Panel):
         option:
             See :meth:`Signal3D.bscan` documentation for supported options.
 
+        skew_angle : float, optional
+            If this is not :const:`None`, then the Signal3D is first skewed before computing the
+            C-scan. this option is provide here, because it is common to use the projected
+            C-scans in ultrasonics.
+
+        start, stop, ts : See :meth:`Signal2D.skew()` documentation for details.
+
         Returns
         -------
         : Signal2D
             A Scan2D object representing the C-scan.
         """
-        return self.extract(option, axis=1).T
+        if skew_angle is not None:
+            out = self.skew(skew_angle, axis='y', skew_axes='x', start=start, stop=stop, ts=ts,
+                            **kwargs)
+        else:
+            out = self
+
+        if option == 'max':
+            return out.abs().max(axis=1).T
+        elif option == 'var':
+            return out.var(axis=1).T
+        else:
+            return out.extract(option, axis=1)
 
     def skew(self, angle,  axis, skew_axes=1, start=None, stop=None, ts=None, **kwargs):
         """

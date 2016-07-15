@@ -213,7 +213,7 @@ class Signal(pd.Series):
         extent : float
             The desired signal length in *index* units.
 
-        fill : {'edge', float}, optional
+        fill : {'edge', 'min', 'max', float}, optional
             Value used to fill the padded signal. If specified as 'edge', then the signal will be
             padded by the edge value of the signal. Thus padding to the right will pad with the
             value of the last sample, and padding to the left will use the value of the first
@@ -250,22 +250,22 @@ class Signal(pd.Series):
         else:
             raise ValueError('Unknown value for position.')
 
-        out = self
-        if npad_right != 0:
-            if npad_right > 0:
-                val = self.iloc[-1] if fill == 'edge' else fill
-                s = Signal(val, index=self.index[-1] + np.arange(1, npad_right + 1) * self.ts)
-                out = pd.concat((out, s))
-            else:
-                out = out.iloc[:npad_right]
-        if npad_left != 0:
-            if npad_left > 0:
-                val = self.iloc[0] if fill == 'edge' else fill
-                s = Signal(val, index=self.index[0] - np.arange(npad_left, 0, -1) * self.ts)
-                out = pd.concat((s, out))
-            else:
-                out = out.iloc[-npad_left:]
-        return Signal(out)
+        if npad_right >= 0 and npad_left >= 0:
+            index = np.concatenate((self.index[0] - np.arange(npad_left, 0, -1) * self.ts,
+                                    self.index.values,
+                                    self.index[-1] + np.arange(1, npad_right+1) * self.ts))
+        else:
+            index = self.index[-npad_left:npad_right]
+        out = self.reindex(index)
+
+        if fill == 'edge':
+            return out.fillna(method='pad').fillna(method='bfill')
+        elif fill == 'max':
+            return out.fillna(self.max())
+        elif fill == 'min':
+            return out.fillna(self.min())
+        else:
+            return out.fillna(fill)
 
     def segment(self, thres, pulse_width, win_fcn='hann'):
         """
