@@ -48,33 +48,33 @@ class TestSignal2D(unittest.TestCase):
     #     self.assertTrue(type(s.iloc[1, :]) == Signal)
 
     def test_shift_axis_axisnone(self):
-        s = Signal2D(np.ones(12).reshape(4, 3))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[-1, 0, 1, 2], columns=[-1, 0, 1])
+        s = Signal2D(np.ones(12).reshape(4, 3), index=[0.0, 1.0, 2.0, 3.0], columns=[0., 1., 2.])
+        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[-1., 0., 1., 2.], columns=[-1., 0., 1.])
         pdt.assert_frame_equal(s.shift_axes(1), s2)
 
     def test_shift_axis_axisnone2(self):
-        s = Signal2D(np.ones(12).reshape(4, 3))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[-1, 0, 1, 2], columns=[-2, -1, 0])
+        s = Signal2D(np.ones(12).reshape(4, 3), index=[0.0, 1.0, 2.0, 3.0], columns=[0., 1., 2.])
+        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[-1., 0., 1., 2.], columns=[-2., -1., 0.])
         pdt.assert_frame_equal(s.shift_axes([1, 2]), s2)
 
     def test_shift_axis_axisindex(self):
-        s = Signal2D(np.ones(12).reshape(4, 3))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[-1, 0, 1, 2])
+        s = Signal2D(np.ones(12).reshape(4, 3), index=[0.0, 1.0, 2.0, 3.0], columns=[0., 1., 2.])
+        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[-1.0, 0.0, 1.0, 2.0], columns=[0., 1., 2.])
         pdt.assert_frame_equal(s.shift_axes(1, axes='y'), s2)
 
     def test_shift_axis_axisindex2(self):
-        s = Signal2D(np.ones(12).reshape(4, 3))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[-1, 0, 1, 2])
+        s = Signal2D(np.ones(12).reshape(4, 3), index=[0.0, 1.0, 2.0, 3.0], columns=[0., 1., 2.])
+        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[-1., 0., 1., 2.], columns=[0., 1., 2.])
         pdt.assert_frame_equal(s.shift_axes(1, axes=0), s2)
 
     def test_shift_axis_columns(self):
-        s = Signal2D(np.ones(12).reshape(4, 3))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), columns=[-1, 0, 1])
+        s = Signal2D(np.ones(12).reshape(4, 3), index=[0.0, 1.0, 2.0, 3.0], columns=[0., 1., 2.])
+        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[0.0, 1.0, 2.0, 3.0], columns=[-1., 0., 1.])
         pdt.assert_frame_equal(s.shift_axes(1, axes='x'), s2)
 
     def test_shift_axis_columns2(self):
-        s = Signal2D(np.ones(12).reshape(4, 3))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), columns=[-1, 0, 1])
+        s = Signal2D(np.ones(12).reshape(4, 3), index=[0.0, 1.0, 2.0, 3.0], columns=[0., 1., 2.])
+        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[0.0, 1.0, 2.0, 3.0], columns=[-1., 0., 1.])
         pdt.assert_frame_equal(s.shift_axes(1, axes=1), s2)
 
     def test_scale_axis_axisnone_startstopnone(self):
@@ -236,7 +236,6 @@ class TestSignal2D(unittest.TestCase):
     def test_window_fftbins(self):
         t = np.arange(7) * 1e-6 - 3e-6
         x = np.arange(6) * 1e-3
-
         s = Signal2D(np.ones((7, 6)), index=t, columns=x)
 
         swindowed = Signal2D([[0., 0., 0., 0., 0., 0.],

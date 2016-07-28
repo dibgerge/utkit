@@ -333,8 +333,8 @@ class Signal3D(pd.Panel):
             A Scan2D object representing the C-scan.
         """
         if skew_angle is not None:
-            out = self.skew(skew_angle, axis='y', skew_axes='x', start=start, stop=stop, ts=ts,
-                            **kwargs)
+            out = self.skew(skew_angle, axis='y', skew_axes='x', start=start, stop=stop,
+                            ts=ts, **kwargs)
         else:
             out = self
 
@@ -345,7 +345,8 @@ class Signal3D(pd.Panel):
         else:
             return out.extract(option, axis=1)
 
-    def skew(self, angle,  axis, skew_axes=1, start=None, stop=None, ts=None, **kwargs):
+    def skew(self, angle,  axis, skew_axes=1, start=None, stop=None, interpolate=True,
+             ts=None, **kwargs):
         """
         Applies a 2-D skew for each slice along a specified axis. Uses interpolation to
         recalculate the signal values at the new coordinates.
@@ -380,7 +381,7 @@ class Signal3D(pd.Panel):
         if 'method' not in kwargs:
             kwargs['method'] = 'nearest'
         return self.apply(lambda x: x.skew(angle, axes=skew_axes, start=start, stop=stop,
-                                           ts=ts, interpolate=True, **kwargs), axis=other_ax)
+                                           ts=ts, interpolate=interpolate, **kwargs), axis=other_ax)
 
     def flatten(self):
         """

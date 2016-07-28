@@ -407,7 +407,7 @@ class Signal2D(pd.DataFrame):
         : Signal2D
             A new Signal2D with shifted axes.
         """
-        shift = self._set_val_on_axes(shift, axes, [0, 0])
+        shift = self._set_val_on_axes(shift, axes, [0.0, 0.0])
         return Signal2D(self.values, index=self.index-shift[0], columns=self.columns-shift[1])
 
     def scale_axes(self, scale, start=None, stop=None, axes=None):
@@ -554,9 +554,9 @@ class Signal2D(pd.DataFrame):
 
             return Signal2D(vals, index=ynew, columns=xnew)
         else:
-            return x, y
+            return pd.Series(np.ravel(self.values), index=[np.ravel(x), np.ravel(y)])
 
-    def pad(self, extent, axes, fill=0.0, position='split'):
+    def pad(self, extent, axes=None, fill=0.0, position='split'):
         """
         Adds padding along the given axes.
 
@@ -592,8 +592,8 @@ class Signal2D(pd.DataFrame):
             region is equal to the mean sampling rate of the corresponding axis.
 
         """
-        extent = self._set_val_on_axes(extent, axes, self.extent)
-        npad = np.array([int(np.ceil((extent[i] - self.extent[i]) / self.ts[i])) for i in [0, 1]])
+        extent = self._set_val_on_axes(extent, axes, np.array(self.extent) + np.array(self.ts))
+        npad = np.array([int(np.ceil(extent[i]/self.ts[i] - self.shape[i])) for i in [0, 1]])
         npad_start, npad_end = npad, npad
         if position == 'end':
             npad_start = [0, 0]
@@ -603,15 +603,12 @@ class Signal2D(pd.DataFrame):
             npad_start, npad_end = np.floor(npad / 2), np.ceil(npad / 2)
         else:
             raise ValueError('Unknown value for position.')
-
         ax = []
         for i in [0, 1]:
             if npad_end[i] >= 0 and npad_start[i] >= 0:
-                ax.append(np.concatenate((self.axes[i].values[0] - np.arange(npad_start[i], 0,
-                                                                             -1) * self.ts[i],
-                                          self.axes[i].values,
-                                          self.axes[i].values[-1] + np.arange(1, npad_end[i]+1)
-                                          * self.ts[i])))
+                left_part = self.axes[i].values[0] - np.arange(npad_start[i], 0, -1) * self.ts[i]
+                right_part = self.axes[i].values[-1] + np.arange(1, npad_end[i]+1) * self.ts[i]
+                ax.append(np.concatenate((left_part, self.axes[i].values, right_part)))
             else:
                 ax.append(self.axes[i][-npad_start[i]:npad_end[i]])
         if fill == 'min':
@@ -619,6 +616,66 @@ class Signal2D(pd.DataFrame):
         elif fill == 'max':
             fill = self.max().max()
         return self.reindex(index=ax[0], columns=ax[1], fill_value=fill)
+
+    def pad_coords(self, index=None, columns=None, fill=0.0):
+        """
+        This allows padding by specifying the start and end of the coordinates for each of the axes.
+
+        Parameters
+        ----------
+        index : 2-element array, optional
+            Specifies the start and end of the index.
+
+        columns : 2-element array, optional
+            Specified the start and end of the columns.
+
+        fill : float, optional
+             The value to fill the padded regions:
+                * 'min': Pad with values of the minimum amplitude in the signal.
+                * 'max': Pad with the value of the maximum amplitude in the signal.
+                * scalar: otherwise, a custom scalar value can be specified for the padding.
+
+        Returns
+        -------
+        : Signal2D
+            The padded signal.
+        """
+        if index is not None and len(index) != 2:
+            raise ValueError('index_range should have a size of 2.')
+
+        if columns is not None and len(columns) != 2:
+            raise ValueError('columns_range should have a size of 2.')
+
+        x, y = self.columns, self.index
+        if index is not None:
+            y = np.arange(index[0], index[1], self.ts[0])
+
+        if columns is not None:
+            x = np.arange(columns[0], columns[1], self.ts[1])
+
+        out = self.reindex(index=y, columns=x)
+        print(out)
+        # out.loc[out.index < self.index[0]] = fill
+        # out.loc[out.index > self.index[-1]] = fill
+        # out.loc[:, out.columns < self.columns[0]] = fill
+        # out.loc[:, out.columns > self.columns[-1]] = fill
+        return out
+
+
+        # index_start_pad, index_end_pad = self.extent[0], self.extent[0]
+        # columns_start_pad, columns_end_pad = self.extent[1], self.extent[1]
+        #
+        # if index is not None:
+        #     index_start_pad = self.extent[0] + self.index.min() - index[0]
+        #     index_end_pad = self.extent[0] - (self.index.max() - index[1])
+        #
+        # if columns is not None:
+        #     columns_start_pad = self.extent[1] + self.columns.min() - columns[0]
+        #     columns_end_pad = self.extent[1] - (self.columns.max() - columns[1])
+        #
+        # out = self.pad([index_start_pad, columns_start_pad], axes=None, fill=fill, position='start')
+        # out = out.pad([index_end_pad, columns_end_pad], axes=None, fill=fill, position='end')
+        # return out
 
     def flip(self, axes=None):
         """

@@ -49,7 +49,6 @@ def read_saft(fname):
     return ut.Signal3D(data, items=Y, major_axis=t, minor_axis=X), header
 
 
-# ________________________________________________________________________#
 def _header_field(htext, start_ind, field_len, dtype=None):
     """ Reads a specified field in the SAFT header."""
     special_chars = '\xcd\x00\x20'
