@@ -27,6 +27,11 @@ class Signal3D(pd.Panel):
         from .signal2d import Signal2D
         return Signal2D
 
+    @classmethod
+    def from_panel(cls, pnl):
+        return cls(pnl.values, items=pnl.items, major_axis=pnl.major_axis,
+                   minor_axis=pnl.minor_axis)
+
     def operate(self, option='', axis=0):
         """
         Operate on the signal along a given axis.
@@ -227,6 +232,38 @@ class Signal3D(pd.Panel):
         newminor[(newminor >= start[1]) & (newminor <= stop[2])] *= scale[2]
         return Signal3D(self.values, items=newitems, major_axis=newmajor, minor_axis=newminor)
 
+    def skew(self, angle, axis, skew_axes=1, start=None, stop=None, interpolate=True,
+             ts=None, **kwargs):
+        """
+        Applies a 2-D skew for each slice along a specified axis. Uses interpolation to
+        recalculate the signal values at the new coordinates.
+        Note
+        ----
+        This does not perform a 3-D skew and interpolation, but only a 2-D skew and
+        interpolation, along a specified 3rd axis.
+        Parameters
+        ----------
+        angle : float, 2-element array
+            The angle of the skew.
+        axis : {0/'y'/'items', 1/'t'/'major_axis', 2/'x'/'minor_axis'}
+            The axis along which to extract each slice to be skewed.
+        skew_axes: {0/'y'/'index', 1/'x'/'columns', None}, optional
+            Determine along which axis to apply the skew, after extracting the slice along the
+            specified *axis*. The axes domain is in that of :class:`Signal2D`.
+        start, stop, ts : See :meth:`Signal2D.skew()` for documentation on these arguments.
+        Returns
+        -------
+        : Signal3D
+            A copy of Signal3D after application of the skew.
+        """
+        other_ax = self._get_other_axes(axis)
+
+        # Make nearest neighbor the default interpolation method.
+        if 'method' not in kwargs:
+            kwargs['method'] = 'nearest'
+        return self.apply(lambda x: x.skew(angle, axes=skew_axes, start=start, stop=stop,
+                                           ts=ts, interpolate=interpolate, **kwargs), axis=other_ax)
+
     def extract(self, option='max', axis=0):
         """
         Extracts a Signal2D according to a given option by slicing along a specified axis.
@@ -308,80 +345,6 @@ class Signal3D(pd.Panel):
             Extracted B-scan as a Signal2D object.
         """
         return self.extract(option, axis=0)
-
-    def cscan(self, option='max', skew_angle=None, start=None, stop=None, ts=None, **kwargs):
-        """
-        Computes C-scan image generally used for Ultrasound Testing. This collapses the
-        raster scan along the t direction, or takes a slice at a given t coordinate,
-        resulting in an image spanning the X-Y axes.
-
-        Parameters
-        ----------
-        option:
-            See :meth:`Signal3D.bscan` documentation for supported options.
-
-        skew_angle : float, optional
-            If this is not :const:`None`, then the Signal3D is first skewed before computing the
-            C-scan. this option is provide here, because it is common to use the projected
-            C-scans in ultrasonics.
-
-        start, stop, ts : See :meth:`Signal2D.skew()` documentation for details.
-
-        Returns
-        -------
-        : Signal2D
-            A Scan2D object representing the C-scan.
-        """
-        if skew_angle is not None:
-            out = self.skew(skew_angle, axis='y', skew_axes='x', start=start, stop=stop,
-                            ts=ts, **kwargs)
-        else:
-            out = self
-
-        if option == 'max':
-            return out.abs().max(axis=1).T
-        elif option == 'var':
-            return out.var(axis=1).T
-        else:
-            return out.extract(option, axis=1)
-
-    def skew(self, angle,  axis, skew_axes=1, start=None, stop=None, interpolate=True,
-             ts=None, **kwargs):
-        """
-        Applies a 2-D skew for each slice along a specified axis. Uses interpolation to
-        recalculate the signal values at the new coordinates.
-
-        Note
-        ----
-        This does not perform a 3-D skew and interpolation, but only a 2-D skew and
-        interpolation, along a specified 3rd axis.
-
-        Parameters
-        ----------
-        angle : float, 2-element array
-            The angle of the skew.
-
-        axis : {0/'y'/'items', 1/'t'/'major_axis', 2/'x'/'minor_axis'}
-            The axis along which to extract each slice to be skewed.
-
-        skew_axes: {0/'y'/'index', 1/'x'/'columns', None}, optional
-            Determine along which axis to apply the skew, after extracting the slice along the
-            specified *axis*. The axes domain is in that of :class:`Signal2D`.
-
-        start, stop, ts : See :meth:`Signal2D.skew()` for documentation on these arguments.
-
-        Returns
-        -------
-        : Signal3D
-            A copy of Signal3D after application of the skew.
-        """
-        other_ax = self._get_other_axes(axis)
-
-        # Make nearest neighbor the default interpolation method.
-        if 'method' not in kwargs:
-            kwargs['method'] = 'nearest'
-        return self.apply(lambda x: x.skew(angle, axes=skew_axes, start=start, stop=stop,
-                                           ts=ts, interpolate=interpolate, **kwargs), axis=other_ax)
 
     def flatten(self):
         """

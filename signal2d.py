@@ -4,6 +4,7 @@ from scipy.signal import hilbert, get_window
 from scipy.interpolate import griddata
 from scipy.fftpack import fft2, fftfreq, fftshift, ifft2
 from .signal3d import Signal3D
+from matplotlib import pyplot
 
 
 class Signal2D(pd.DataFrame):
@@ -322,7 +323,6 @@ class Signal2D(pd.DataFrame):
                 indices[i] = self._set_val_on_axes(indices[i], axes, [self.index[i],
                                                                       self.columns[i]])
         win2d = Signal2D(0, index=self.index, columns=self.columns)
-
         win1 = get_window(win_fcn, win2d.loc[indices[0][0]:indices[1][0]].shape[0])
         win2 = get_window(win_fcn, win2d.loc[:, indices[0][1]:indices[1][1]].shape[1])
         win = np.sqrt(np.outer(win1, win2))
@@ -377,14 +377,14 @@ class Signal2D(pd.DataFrame):
             The new filtered signal.
         """
         axes = self._make_axes_as_num(axes)
-        fdomain = self.fft(axes=axes)
+        fdomain = self.fft()
         low_freq = self._set_val_on_axes(low_freq, axes, [0.0, 0.0])
         high_freq = self._set_val_on_axes(high_freq, axes, [fdomain.index.max(),
                                                             fdomain.columns.max()])
         fdomain = fdomain.window(index1=low_freq, index2=high_freq, axes=axes, win_fcn=win_fcn,
                                  fftbins=True)
-        vals = fftshift(fdomain.values, axes=axes)
-        ift = ifft2(vals, axes=axes)
+        vals = fftshift(fdomain.values)
+        ift = ifft2(vals)
         return Signal2D(np.real(ift), index=self.index, columns=self.columns)
 
     def shift_axes(self, shift, axes=None):
@@ -768,9 +768,11 @@ class Signal2D(pd.DataFrame):
             A copy of signal2D with means subtracted along given axes.
         """
         axes = self._make_axes_as_num(axes)
-        out = self.copy()
-        for ax in axes:
-            out = out - self.mean(axis=ax)
+        out = self
+        if 0 in axes:
+            out = self - self.mean(0)
+        if 1 in axes:
+            out = (self.T - self.mean(1)).T
         return out
 
     def extract(self, axis=1, option='max'):
@@ -798,7 +800,7 @@ class Signal2D(pd.DataFrame):
             raise ValueError('axis cannot be None, or an array.')
         if option.lower() == 'max':
             x, y = self.max_point()
-            if 0 in axis == 0:
+            if 0 in axis:
                 out = self.loc[y, :]
                 coord = y
             elif 1 in axis:

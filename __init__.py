@@ -23,7 +23,7 @@ The library supports three data structures:
 from .signal import *
 from .signal2d import *
 from .signal3d import *
-from .peakutils import *
+from . import peakutils
 
 
 __version__ = 0.2

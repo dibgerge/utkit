@@ -296,7 +296,8 @@ class Signal(pd.Series):
             A list with elements of type :class:`Signal`. Each Signal element represents an
             extracted segment.
         """
-        peak_ind = peakutils.indexes(self.values, thres=thres, min_dist=int(pulse_width * self.fs))
+        sig = self.operate('e')
+        peak_ind = peakutils.indexes(sig.values, thres=thres, min_dist=int(pulse_width * self.fs))
         wind_len = np.mean(np.diff(self.index[peak_ind]))
         parts = [self.window(index1=self.index[i]-wind_len/2.0,
                              index2=self.index[i]+wind_len/2.0,
@@ -430,7 +431,7 @@ class Signal(pd.Series):
             except IndexError:
                 raise ValueError('Another signal should be specified to compute the tof using the '
                                  'correlation method.')
-            c = fftconvolve(self('n'), other('n')[::-1], mode='full')
+            c = fftconvolve(self.operate('n'), other.operate('n')[::-1], mode='full')
             ind = self.size - np.argmax(c)
             return self.ts * ind
         elif method.lower() == 'max':
@@ -663,7 +664,6 @@ class Signal(pd.Series):
 
         fdomain = self.fft(ssb=True, nfft=nfft)
         lims = fdomain.abs().limits(threshold)
-        print(lims)
         return lims[1] - lims[0]
 
     def maxof(self, option='peak'):
