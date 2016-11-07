@@ -6,6 +6,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import simps
 from . import peakutils
 from .signal2d import Signal2D
+from matplotlib import pyplot
 
 
 class Signal(pd.Series):
@@ -364,7 +365,6 @@ class Signal(pd.Series):
         """
         if nfft is None:
             nfft = self.size
-
         uf = Signal(fftshift(fft(self, n=nfft)), index=fftshift(fftfreq(nfft, self.ts)))
         return uf[uf.index >= 0] if ssb else uf
 
@@ -507,6 +507,32 @@ class Signal(pd.Series):
         nol = int(overlap * self.fs)
         f, pxx = welch(self.values, fs=self.fs, nperseg=nperseg, noverlap=nol, **kwargs)
         return Signal(pxx, index=f)
+
+    def psd_feature(self, fc, width, overlap=0, nfft=None):
+        """
+
+        Parameters
+        ----------
+        fc
+        width
+        overlap
+        nfft
+
+        Returns
+        -------
+
+        """
+        start = self.index[0]
+        amp = 0
+        nbins = 0
+        nsamples = len(self.loc[start:(start + width)])
+        while start + width <= self.index[-1]:
+            nbins += 1
+            s_seg = self.loc[start:(start + width)]
+            yf = s_seg.fft(ssb=True, nfft=nfft).abs()
+            start += width - overlap
+            amp += (yf(fc).values[0])**2
+        return nbins, nsamples, amp
 
     def coherence(self, other, width, overlap=0, **kwargs):
         """
@@ -746,7 +772,7 @@ class Signal(pd.Series):
     @property
     def ts(self):
         """ Get the signal sampling period. """
-        return np.mean(np.diff(self.index[self.index >= 0]))
+        return np.mean(np.diff(self.index))
 
     @property
     def extent(self):

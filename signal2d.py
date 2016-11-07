@@ -77,7 +77,7 @@ class Signal2D(pd.DataFrame):
     def _constructor_expanddim(self):
         return Signal3D
 
-    def __call__(self, index, columns, **kwargs):
+    def __call__(self, index=None, columns=None, **kwargs):
         """
         Interpolate the axes. This function used :func:`scipy.interpolate.griddata`.
 
@@ -99,7 +99,15 @@ class Signal2D(pd.DataFrame):
         Other keyword arguments are passed directly to the interpolation function
         :func:`scipy.interpolate.griddata`.
         """
+        if index is None:
+            index = self.index.values
+        if columns is None:
+            columns = self.columns.values
         index, columns = np.array(index), np.array(columns)
+        if index.ndim == 0:
+            index = np.array([index])
+        if columns.ndim == 0:
+            columns = np.array([columns])
         if (index.ndim != 1) or (columns.ndim != 1):
             raise TypeError('New index and columns must be one dimensional arrays.')
 
@@ -236,7 +244,7 @@ class Signal2D(pd.DataFrame):
         out_vals[np.isnan(out_vals)] = np.array(assign)[np.isnan(out_vals)]
         return out_vals
 
-    def fft(self, ssb=False, axes=(0, 1), **kwargs):
+    def fft(self, ssb=False, axes=(0, 1), shape=None, **kwargs):
         """
         Computes the Fourier transform in two dimensions, or along a specified axis.
 
@@ -259,10 +267,10 @@ class Signal2D(pd.DataFrame):
         :func:`scipy.fftpack.fft2`.
         """
         axes = self._make_axes_as_num(axes)
-        fval = fftshift(fft2(self.values, axes=axes, **kwargs), axes=axes)
-        coords = [self.axes[i].values for i in range(self.ndim)]
+        fval = fftshift(fft2(self.values, axes=axes, shape=shape, **kwargs), axes=axes)
+        coords = [None, None]
         for ax in axes:
-            coords[ax] = fftshift(fftfreq(coords[ax].size, self.ts[ax]))
+            coords[ax] = fftshift(fftfreq(fval.shape[ax], self.ts[ax]))
         s = Signal2D(fval, index=coords[0], columns=coords[1])
 
         if ssb:
@@ -386,6 +394,33 @@ class Signal2D(pd.DataFrame):
         vals = fftshift(fdomain.values)
         ift = ifft2(vals)
         return Signal2D(np.real(ift), index=self.index, columns=self.columns)
+
+    def psd_feature(self, fc, width, overlap=0, **kwargs):
+        """
+        Currently only along the 0 axis.
+        Parameters
+        ----------
+        fc
+        width
+        overlap
+        nfft
+
+        Returns
+        -------
+
+        """
+        start = self.index[0]
+        amp = 0
+        while start < self.index[-1]:
+            s_seg = self.loc[start:(start + width)]
+            if len(s_seg) <= 1:
+                break
+            n = len(s_seg)
+            yf = s_seg.fft(ssb=True, axes=0, **kwargs).abs()
+            print(n, self.shape)
+            start += width - overlap
+            amp += 2 * yf(fc).values**2 / n
+        return amp
 
     def shift_axes(self, shift, axes=None):
         """
