@@ -754,7 +754,7 @@ class Signal(pd.Series):
         if option == 'abs':
             return simps(self.values**2, x=self.index)
         elif option == 'env':
-            return simps(self('e'), x=self.index)
+            return simps(self.operate('e'), x=self.index)
         else:
             raise ValueError("The value for option is unknown. Should be either 'abs' or 'env'.")
 
