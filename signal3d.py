@@ -5,18 +5,30 @@ from scipy.signal import hilbert
 
 class Signal3D(pd.Panel):
     """
-    Represents data from a raster scan. Each point is represented by its 2-D coordnates
-    (X, Y), and contains a time series signal with time base t.
-    The axes are such that:
+    Represents data from raster scans. Each point is represented by its 2-D coordinates
+    (X, Y), and contains a time series signal with time base t. By convention, the last axis is
+    reserved for the time signals, and the first two axes compose the (X,Y) pairs.
 
-        * **axis 0 (items)**: *y*-axis representing scan index,
-        * **axis 1 (major_axis)**: time base *t* for each time series,
-        * **axis 2 (minor_axis)**: *x*-axis representing scan position.
+    Since this is a specialized Ultrasound library, we make the following convention:
+     * axis 0: The scan direction along the x-axis.
+     * axis 1: The scan direction along the y-axis.
+     * axis 2: The time series signals.
 
     .. autosummary::
 
         shift_axis
     """
+    def __init__(self, data, items=None, major_axis=None, minor_axis=None, **kwargs):
+        super().__init__(data=data, items=items, major_axis=major_axis, minor_axis=minor_axis,
+                         **kwargs)
+        self.items = self.items.astype(dtype=np.float64)
+        self.major_axis = self.major_axis.astype(dtype=np.float64)
+        self.minor_axis = self.minor_axis.astype(dtype=np.float64)
+
+        for ax in self.axes:
+            if not ax.is_monotonic_increasing:
+                raise ValueError('Indices along all dimensions should be monotonically '
+                                 'increasing. ')
 
     @property
     def _constructor(self):
@@ -32,7 +44,7 @@ class Signal3D(pd.Panel):
         return cls(pnl.values, items=pnl.items, major_axis=pnl.major_axis,
                    minor_axis=pnl.minor_axis)
 
-    def operate(self, option='', axis=0):
+    def operate(self, option='', axis=2):
         """
         Operate on the signal along a given axis.
 
@@ -60,7 +72,7 @@ class Signal3D(pd.Panel):
         : Signal3D
             The modified Signal3D.
         """
-        axis = self._make_axis_as_num(axis)
+        axis = self._get_axis_number(axis)
         yout = self
         if 'e' in option:
             yout = np.abs(hilbert(yout, axis=axis))
@@ -71,37 +83,19 @@ class Signal3D(pd.Panel):
         return Signal3D(yout, items=self.items, major_axis=self.major_axis,
                         minor_axis=self.minor_axis)
 
-    def _get_other_axes(self, axis):
-        axis = self._make_axis_as_num(axis)
-        if axis == 0:
-            return [1, 2]
-        if axis == 1:
-            return [0, 2]
-        if axis == 2:
-            return [0, 1]
-        raise ValueError('Unknown axis value.')
+    @staticmethod
+    def _get_other_axes(axis):
+        return np.setdiff1d([0, 1, 2], axis)
+
+    def _get_axes_numbers(self, axes):
+        if isinstance(axes, str):
+            return self._get_axis_number(axes)
+        elif hasattr(axes, '__len__'):
+            return [self._get_axis_number(ax) for ax in axes]
+        return axes
 
     @staticmethod
-    def _make_axis_as_num(axis, soft_error=False):
-        """
-        Returns the number of the axis, according to the naming conventions of the axes.
-        """
-        if isinstance(axis, str):
-            axis = axis.lower()
-
-        if axis in [0, 'y', 'items']:
-            return 0
-        if axis in [1, 't', 'major_axis']:
-            return 1
-        if axis in [2, 'x', 'minor_axis']:
-            return 2
-
-        if soft_error:
-            return None
-        else:
-            raise ValueError('Unknown axis value.')
-
-    def _verify_val_and_axis(self, val, axis, assign, raise_none=True):
+    def _cook_axes_args(val, axes):
         """
         Internal method to verify that a value is 3-element array. If it is a scalar or
         const:`None`, the missing values are selected based on the given *axis*.
@@ -111,158 +105,126 @@ class Signal3D(pd.Panel):
         val : float, array_like
             This is the value to be tested
 
-        axis : int
+        axes : int
             The axis for which the *val* corresponds.
-
-        assign : array_like, 3-elements
-            The values to assigns to new *val* if the input *val* is a scalar or const:`None`.
-
-        raise_none : bool, optional
-            If const:`True`, raise an error if *val* is const:`None`.
 
         Returns
         -------
         : 2-tuple
             A 2-element array representing the filled *val* with missing axis value.
         """
-        axis = self._make_axis_as_num(axis)
+        if axes is None:
+            axes = np.arange(3)
+        elif not hasattr(axes, '__len__'):
+            axes = [axes]
 
-        if isinstance(axis, str):
-            axis = axis.lower()
+        if not hasattr(val, '__len__'):
+            val = np.ones(len(axes))*val
 
-        if val is None:
-            if raise_none:
-                raise ValueError('value cannot be None.')
-            return assign
+        if len(val) != len(axes):
+            raise ValueError('value and axes have different lengths.')
+        return val, axes
 
-        try:
-            if len(val) != 3:
-                raise ValueError('value should be either a scalar or a 3 element array.')
-            if axis is None:
-                return val
-            else:
-                raise ValueError('value must be a scalar is axis is specified.')
-        except TypeError:
-            if axis is None:
-                return [val, val, val]
-            elif axis == 0:
-                return [val, assign[1], assign[2]]
-            elif axis == 1:
-                return [assign[0], val, assign[2]]
-            elif axis == 2:
-                return [assign[0], assign[1], val]
-            else:
-                raise ValueError('Unknown value for axis. See documentation for allowed axis '
-                                 'values.')
-
-    def shift_axis(self, shift, axis=None):
+    def shift_axes(self, shift, axes=None, inplace=False):
         """
         Applies shifting of a given axis.
 
         Parameters
         ----------
-        shift : float
-            The amount to shift the axis.
+        shift : float, array_like
+            The value to shift the axis. If this is an array, it should be the same size as
+            :attr:`axes`.
 
-        axis : int/string, optional
-            If 0/'y'/'items', shift the y-axis, if 1/'t'/'major_axis', shift the t-axis. If
-            2/'x'/'minor_axis' shift the x-axis. If None shift all axes.
+        axes : int, string, array_like, optional
+            Specifies which of the axes to shift. To shift a single axis, :attr:`axes` is an
+            int or string representing the dimension or the axis alias name. To shift
+            multiple axes, :attr:`axes` can be an array of value or string names. If axes is
+            :const:`None`, all three axes are shifted.
+
+        inplace : bool
+            Modify the current instance if True.
 
         Returns
         -------
         : Signal3D
-            A copy of Signal3D with shifts axes.
+            A copy of Signal3D with shifted axes, or the current instance if :attr:`inplace` is
+            :const:`True`.
         """
-        shift = self._verify_val_and_axis(shift, axis, assign=[0, 0, 0], raise_none=True)
-        return Signal3D(self.values, items=self.items-shift[0],
-                        major_axis=self.major_axis-shift[1], minor_axis=self.minor_axis-shift[2])
+        axes = self._get_axes_numbers(axes)
+        shift, axes = self._cook_axes_args(shift, axes)
+        out = Signal3D(self.values, items=self.items, major_axis=self.major_axis,
+                       minor_axis=self.minor_axis) if not inplace else self
+        for i, ax in enumerate(axes):
+            out.set_axis(ax, out.axes[ax] - shift[i])
+        return out
 
-    def scale_axes(self, scale, start=None, stop=None, axis=None):
+    def scale_axes(self, scale, axes=None, inplace=False):
         """
-        Scales a given axis (or both) by a given amount.
+        Scale axes by a given amount.
 
         Parameters
         ----------
         scale : float, array_like
-            The amount to scale the axis. If axis is specified,
-            *scale* should be scalar. If no axis specified *scale* can be a scalar (scale both
-            axes by the same amount), or a 2-element vector for a different scale value for each
-            axis.
+            The amount to scale the axes. If :attr:`scale` is an array, it should be the same
+            size as :attr:`axes`.
 
-        start : float, optional
-            The axis value at which to start applying the scaling. If not
-            specified, the whole axis will be scaled starting from the first axis value. If
-            *axis* is specified, *start* should be a scalar, otherwise, *start* can be either a
-            scalar (scale both axes by the same factor), or a 2-element array for scaling each
-            axis differently.
+        axes : int, string, array_like, optional
+            Specifies which of the axes to shift. To shift a single axis, :attr:`axes` is an
+            int or string representing the dimension or the axis alias name. To shift
+            multiple axes, :attr:`axes` can be an array of value or string names. If axes is
+            :const:`None`, all three axes are shifted.
 
-        stop : float, optional
-            The axis value at which to end the scaling. If not specified, the axis will be
-            scaled up to the last axis value. If *axis* is specified, *end* should be a
-            scalar, otherwise, *end* can be either a scalar (scale both axes by the same
-            factor), or a 2-element array for scaling each axis differently.
+        inplace : bool
+            Modify the current instance if True.
 
-        axis : int/string, optional
-            If 0, 'Y' or index, scale the index, if 1, 'X' or 'columns', scale the columns. If None
-            scale both axes.
-
-        Returns
-        -------
-        : Signal2D
-            A copy of Signal2D with scaled axes.
-
-        Note
-        ----
-        If only partial domain on the axis is specified for scaling results in non-monotonic
-        axis, an exception error will occur.
-        """
-        start = self._verify_val_and_axis(start, axis, [self.axes[0][0], self.axes[1][0],
-                                                        self.axes[2][0]], raise_none=False)
-        stop = self._verify_val_and_axis(stop, axis, [self.axes[0][-1], self.axes[1][-1],
-                                                      self.axes[2][-1]], raise_none=False)
-
-        if start[0] > stop[0] or start[1] > stop[1] or start[2] > stop[2]:
-            raise ValueError('start should be smaller than end.')
-
-        scale = self._verify_val_and_axis(scale, axis, [1., 1., 1.], raise_none=True)
-        newitems, newmajor, newminor = self.items.values, self.major_axis.values, \
-                                       self.minor_axis.values
-        newitems[(newitems >= start[0]) & (newitems <= stop[0])] *= scale[0]
-        newmajor[(newmajor >= start[1]) & (newmajor <= stop[1])] *= scale[1]
-        newminor[(newminor >= start[1]) & (newminor <= stop[2])] *= scale[2]
-        return Signal3D(self.values, items=newitems, major_axis=newmajor, minor_axis=newminor)
-
-    def skew(self, angle, axis, skew_axes=1, start=None, stop=None, interpolate=True,
-             ts=None, **kwargs):
-        """
-        Applies a 2-D skew for each slice along a specified axis. Uses interpolation to
-        recalculate the signal values at the new coordinates.
-        Note
-        ----
-        This does not perform a 3-D skew and interpolation, but only a 2-D skew and
-        interpolation, along a specified 3rd axis.
-        Parameters
-        ----------
-        angle : float, 2-element array
-            The angle of the skew.
-        axis : {0/'y'/'items', 1/'t'/'major_axis', 2/'x'/'minor_axis'}
-            The axis along which to extract each slice to be skewed.
-        skew_axes: {0/'y'/'index', 1/'x'/'columns', None}, optional
-            Determine along which axis to apply the skew, after extracting the slice along the
-            specified *axis*. The axes domain is in that of :class:`Signal2D`.
-        start, stop, ts : See :meth:`Signal2D.skew()` for documentation on these arguments.
         Returns
         -------
         : Signal3D
-            A copy of Signal3D after application of the skew.
+            A copy of Signal3D with scaled axes or the current instance if  :attr:`inplace` is
+            :const:`True`.
         """
-        other_ax = self._get_other_axes(axis)
+        axes = self._get_axes_numbers(axes)
+        scale, axes = self._cook_axes_args(scale, axes)
+        out = Signal3D(self.values, items=self.items, major_axis=self.major_axis,
+                       minor_axis=self.minor_axis) if not inplace else self
+        for i, ax in enumerate(axes):
+            out.set_axis(ax, out.axes[ax]*scale[i])
+        return out
 
-        # Make nearest neighbor the default interpolation method.
-        if 'method' not in kwargs:
-            kwargs['method'] = 'nearest'
-        return self.apply(lambda x: x.skew(angle, axes=skew_axes, start=start, stop=stop,
-                                           ts=ts, interpolate=interpolate, **kwargs), axis=other_ax)
+    def skew(self, angle, skew_axis, other_axis):
+        """
+        Obtains the values for the axes after skewing by a certain angle, along a given plane.
+        This method does not change the values of the object, only its axes.
+
+        Parameters
+        ----------
+        angle : float
+            The angle of the skew.
+
+        skew_axis : int, string
+            Name of the axis along which to skew the scan.
+
+        other_axis: int, string
+            Name of the second axis that forms the plane for skewing.
+
+        Returns
+        -------
+        x, y : tuple
+            A tuple representing the two axis value after skewing. Each element in the tuple is a
+            matrix of shape of the current object along the plane formed by skew and other axis.
+        """
+        other_axis = self._get_axis_number(other_axis)
+        skew_axis = self._get_axis_number(skew_axis)
+
+        if other_axis == skew_axis:
+            raise ValueError('other_axis cannot be the same as skew_axis.')
+
+        slice_ax = self._get_other_axes([other_axis, skew_axis])[0]
+        s = self.xs(self.axes[slice_ax][0], slice_ax)
+
+        plane2d_axes = self._get_axes_numbers(self._get_plane_axes_index(slice_ax))
+        x, y, _ = s.skew(angle, plane2d_axes.index(skew_axis), interpolate=False)
+        return x, y
 
     def extract(self, option='max', axis=0):
         """
@@ -277,15 +239,14 @@ class Signal3D(pd.Panel):
             * scalar: A scalar can be specified to select a specific point along the axis
 
         axis : scalar/string, optional
-            The axis along which to extract the slice.  Conventions for naming axes: 0/'y'/'items',
-            1/'t'/'major_axis', or 2/'x'/'minor_axis'.
+            The axis along which to extract the slice.
 
         Returns
         -------
         : Signal2D
             A Signal2D object representing the slice.
         """
-        axis = self._make_axis_as_num(axis)
+        axis = self._get_axis_number(axis)
         other_axes = self._get_other_axes(axis)
 
         if option == 'max':
@@ -295,16 +256,7 @@ class Signal3D(pd.Panel):
             s = self.apply(lambda x: x.var().var(), axis=other_axes)
             option = s.idxmax()
 
-        if axis == 0:
-            out = self.loc[option]
-        elif axis == 1:
-            out = self.loc[:, option, :]
-        elif axis == 2:
-            out = self.loc[:, :, option]
-        else:
-            raise ValueError('Unknown axis value.')
-
-        return option, out
+        return option, self.xs(option, axis=axis)
 
     def dscan(self, option='max'):
         """
@@ -313,7 +265,7 @@ class Signal3D(pd.Panel):
 
         Parameters
         ----------
-        option : {'max', 'var', float} optional
+        option : {'max', 'var', float}, optional
             Select the method to find the slice
             * 'max': The maximum amplitude along the axis
             * 'var': the maximum variance along the axis.
@@ -324,7 +276,7 @@ class Signal3D(pd.Panel):
         : Signal2D
             Extracted D-scan as a Signal2D object.
         """
-        return self.extract(option, axis=2)
+        return self.extract(option, axis=0)
 
     def bscan(self, option='max'):
         """
@@ -344,7 +296,41 @@ class Signal3D(pd.Panel):
         : Signal2D
             Extracted B-scan as a Signal2D object.
         """
-        return self.extract(option, axis=0)
+        return self.extract(option, axis=1)
+
+    def cscan(self, theta=None):
+        """
+        Specialized method for computing the C-Scans from Ultrasound Testing raster scans. This
+        collapses the time axis and provides a top view of the scan, along the *x-y* axes.
+
+        Parameters
+        ----------
+        theta : float
+            The angle for which to skew the scan. This should be the wave propagation angle. The
+            c-scan will be the top view after skew by the given angle.
+
+        Returns
+        -------
+        : Signal2D
+            The computed C-scan.
+        """
+        if theta is None:
+            return self.max(axis=2)
+
+        dx = self.ts[0]
+        x, t = self.skew(theta, 'x', 'z')
+        x /= dx
+        x = x.astype(np.int32)
+        xmin, xmax = np.min(x), np.max(x)
+        nx = xmax - xmin + 1
+
+        out = np.zeros((self.shape[1], nx))
+        vals = np.abs(self.values)
+        for i, coord in enumerate(range(xmin, xmax + 1)):
+            ind0, ind1 = np.where(x == coord)
+            out[:, i] = np.max(vals[ind1, :, ind0], axis=0)
+        from . import Signal2D
+        return Signal2D(out, index=self.major_axis, columns=np.arange(xmin, xmax+1)*dx)
 
     def flatten(self):
         """
@@ -359,12 +345,11 @@ class Signal3D(pd.Panel):
         yv, tv, xv = np.meshgrid(self.Y, self.t, self.X, indexing='xy')
         return np.array([yv.ravel(), tv.ravel(), xv.ravel(), self.values.ravel()])
 
-    @property
-    def axis(self):
-        """
-        Return the values of the three axes in the Signal3D.
-        """
-        return self.items, self.major_axis, self.minor_axis
+    def align(self, other, **kwargs):
+        raise NotImplementedError
+
+    def shift(self, periods=1, freq=None, axis='major'):
+        raise NotImplementedError
 
     @property
     def ts(self):
@@ -377,14 +362,23 @@ class Signal3D(pd.Panel):
     @property
     def x(self):
         """ Convenience property to return X-axis coordinates as ndarray. """
-        return self.minor_axis.values
+        return self.items.values
 
     @property
     def y(self):
         """ Convenience property to return Y-axis coordinates as ndarray. """
-        return self.items.values
+        return self.major_axis.values
 
     @property
     def z(self):
         """ Convenience property to return t-axis coordinates as ndarray. """
-        return self.major_axis.values
+        return self.minor_axis.values
+
+Signal3D._setup_axes(axes=['items', 'major_axis', 'minor_axis'], info_axis=0,
+                     stat_axis=1, aliases={'major': 'major_axis',
+                                           'minor': 'minor_axis',
+                                           'x': 'items',
+                                           'y': 'major_axis',
+                                           'z': 'minor_axis'},
+                     slicers={'major_axis': 'index',
+                              'minor_axis': 'columns'})

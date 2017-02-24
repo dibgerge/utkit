@@ -1,5 +1,5 @@
 import unittest
-from utkit import Signal, Signal2D
+from .. import Signal, Signal2D
 import numpy as np
 import pandas.util.testing as pdt
 import numpy.testing as npt
@@ -86,62 +86,6 @@ class TestSignal2D(unittest.TestCase):
         s = Signal2D(np.ones(12).reshape(4, 3), index=np.arange(4.), columns=np.arange(3.))
         s2 = Signal2D(np.ones(12).reshape(4, 3), index=[0., 0.5, 1., 1.5], columns=[0., 0.25, 0.5])
         pdt.assert_frame_equal(s.scale_axes([0.5, 0.25]), s2)
-
-    def test_scale_axis_axisnone_startnone(self):
-        s = Signal2D(np.ones(12).reshape(4, 3), index=np.arange(4.), columns=np.arange(3.))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[0., 0.5, 1., 3.], columns=[0., 0.25, 0.5])
-        pdt.assert_frame_equal(s.scale_axes([0.5, 0.25], stop=2.), s2)
-
-    def test_scale_axis_axisnone_startnone2(self):
-        s = Signal2D(np.ones(12).reshape(4, 3), index=np.arange(4.), columns=np.arange(3.))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[0., 0.5, 1., 3.], columns=[0., 0.25, 2.])
-        pdt.assert_frame_equal(s.scale_axes([0.5, 0.25], stop=[2., 1.]), s2)
-
-    def test_scale_axis_axisnone_stopnone(self):
-        s = Signal2D(np.ones(12).reshape(4, 3), index=np.arange(4.), columns=np.arange(3.))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[0., 0.5, 1., 1.5], columns=[0., 0.25, 0.5])
-        pdt.assert_frame_equal(s.scale_axes([0.5, 0.25], start=1.), s2)
-
-    def test_scale_axis_axisnone_stopnone2(self):
-        s = Signal2D(np.ones(12).reshape(4, 3), index=np.arange(4.), columns=np.arange(3.))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[0., 1., 1.2, 1.8], columns=[0., 0.25, 0.5])
-        pdt.assert_frame_equal(s.scale_axes([0.6, 0.25], start=[2., 1.]), s2)
-
-    def test_scale_axis_axis0_startstopnone(self):
-        s = Signal2D(np.ones(12).reshape(4, 3), index=np.arange(4.), columns=np.arange(3.))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[0., 0.6, 1.2, 1.8], columns=[0., 1., 2.0])
-        pdt.assert_frame_equal(s.scale_axes(0.6, axes=0), s2)
-
-    def test_scale_axis_axis0_startnone(self):
-        s = Signal2D(np.ones(12).reshape(4, 3), index=np.arange(4.), columns=np.arange(3.))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[0., 0.5, 1., 3.], columns=[0., 1., 2.0])
-        pdt.assert_frame_equal(s.scale_axes(0.5, stop=2, axes=0), s2)
-
-    def test_scale_axis_axis0_stopnone(self):
-        s = Signal2D(np.ones(12).reshape(4, 3), index=np.arange(4.), columns=np.arange(3.))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[0., 1., 4., 6.], columns=[0., 1., 2.0])
-        pdt.assert_frame_equal(s.scale_axes(2., start=2, axes=0), s2)
-
-    def test_scale_axis_axis1(self):
-        s = Signal2D(np.ones(20).reshape(4, 5), index=np.arange(4.), columns=np.arange(5.))
-        s2 = Signal2D(np.ones(20).reshape(4, 5), index=[0., 1., 2., 3.],
-                      columns=[0., 1., 4., 6., 8.])
-        pdt.assert_frame_equal(s.scale_axes(2., start=2., stop=4., axes=1), s2)
-
-    def test_scale_axis_axis1_startstopnone(self):
-        s = Signal2D(np.ones(12).reshape(4, 3), index=np.arange(4.), columns=np.arange(3.))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[0., 1., 2., 3.], columns=[0., 0.5, 1.])
-        pdt.assert_frame_equal(s.scale_axes(0.5, axes=1), s2)
-
-    def test_scale_axis_axis1_startnone(self):
-        s = Signal2D(np.ones(12).reshape(4, 3), index=np.arange(4.), columns=np.arange(3.))
-        s2 = Signal2D(np.ones(12).reshape(4, 3), index=[0., 1., 2., 3.], columns=[0., 0.5, 2.0])
-        pdt.assert_frame_equal(s.scale_axes(0.5, stop=1., axes=1), s2)
-
-    def test_scale_axis_axis1_stopnone(self):
-        s = Signal2D(np.ones(16).reshape(4, 4), index=np.arange(4.), columns=np.arange(4.))
-        s2 = Signal2D(np.ones(16).reshape(4, 4), index=[0., 1., 2., 3.], columns=[0., 1., 4., 6.])
-        pdt.assert_frame_equal(s.scale_axes(2., start=2, axes=1), s2)
 
     def test_window_allindices(self):
         t = np.arange(6)*1e-6
@@ -278,3 +222,36 @@ class TestSignal2D(unittest.TestCase):
                             [0., 0., 0., 0., 1., 1., 1.]],
                            index=t, columns=np.arange(7)*1e-3-4e-3)
         pdt.assert_frame_equal(s.pad(6e-3, axes=1, fill=0., position='start'), spadded)
+
+    def test_get_axes_numbers_two_axes(self):
+        """:meth:`_get_axes_numbers` test"""
+        s = Signal2D(np.arange(10))
+        ax = s._get_axes_numbers(['x', 'y'])
+        self.assertEqual(ax, [1, 0])
+
+    def test_get_axes_numbers_two_axes2(self):
+        """:meth:`_get_axes_numbers` test"""
+        s = Signal2D(np.arange(10))
+        ax = s._get_axes_numbers([1, 0])
+        self.assertEqual(ax, [1, 0])
+
+    def test_get_axes_numbers_none_axis(self):
+        """:meth:`_get_axes_numbers` test"""
+        s = Signal2D(np.arange(10))
+        ax = s._get_axes_numbers(None)
+        self.assertEqual(ax, [0, 1])
+
+    def test_get_axes_numbers_one_axis(self):
+        """:meth:`_get_axes_numbers` test"""
+        s = Signal2D(np.arange(10))
+        ax = s._get_axes_numbers('x')
+        self.assertEqual(ax, [1])
+
+    def test_get_axes_numbers_one_axis2(self):
+        """:meth:`_get_axes_numbers` test"""
+        s = Signal2D(np.arange(10))
+        ax = s._get_axes_numbers(1)
+        self.assertEqual(ax, [1])
+
+    def test_fft(self):
+        pass
