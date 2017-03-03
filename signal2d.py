@@ -744,7 +744,7 @@ class Signal2D(pd.DataFrame):
         : Signal2D
             A copy of signal2D with means subtracted along given axes.
         """
-        axes = self._make_axes_as_num(axes)
+        axes = self._get_axes_numbers(axes)
         out = self
         if 0 in axes:
             out = self - self.mean(0)
