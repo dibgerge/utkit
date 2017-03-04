@@ -1,0 +1,6 @@
+utkit.Signal3D.xs
+=================
+
+.. currentmodule:: utkit
+
+.. automethod:: Signal3D.xs

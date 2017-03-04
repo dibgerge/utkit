@@ -1,0 +1,268 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>utkit.Signal &#8212; UTkit 0.2</title>
+    
+    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="UTkit 0.2" href="../index.html" />
+    <link rel="next" title="utkit.Signal.__call__" href="generated/utkit.Signal.__call__.html" />
+    <link rel="prev" title="UTkit Documentation" href="../index.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="generated/utkit.Signal.__call__.html" title="utkit.Signal.__call__"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="../index.html" title="UTkit Documentation"
+             accesskey="P">previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../index.html">UTkit 0.2</a> &#187;</li>
+ 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="utkit-signal">
+<h1>utkit.Signal<a class="headerlink" href="#utkit-signal" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
+<dt id="utkit.Signal">
+<em class="property">class </em><code class="descclassname">utkit.</code><code class="descname">Signal</code><span class="sig-paren">(</span><em>data=None</em>, <em>index=None</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/utkit/signal.html#Signal"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utkit.Signal" title="Permalink to this definition">¶</a></dt>
+<dd><p>Represents physical signals, by keeping track of the index (time/space) and corresponding
+values. This class extends the Pandas <a class="reference external" href="http://pandas.pydata.org/pandas-docs/version/0.18.0/generated/pandas.Series.html#pandas.Series" title="(in pandas v0.18.0)"><code class="xref py py-class docutils literal"><span class="pre">pandas.Series</span></code></a> class to make it more
+convenient to handle signals generally encountered in ultrasonics or RF.</p>
+<p>The class constructor is the same as that used for <a class="reference external" href="http://pandas.pydata.org/pandas-docs/version/0.18.0/generated/pandas.Series.html#pandas.Series" title="(in pandas v0.18.0)"><code class="xref py py-class docutils literal"><span class="pre">pandas.Series</span></code></a>. In addition,
+if <code class="xref py py-attr docutils literal"><span class="pre">data</span></code> is an array, and <code class="xref py py-attr docutils literal"><span class="pre">index</span></code> is a scalar, then <code class="xref py py-attr docutils literal"><span class="pre">index</span></code> is interpreted as
+the sampling time, and the signal basis will be constructed as uniformly sampled at intervals
+specified by the scalar <code class="xref py py-attr docutils literal"><span class="pre">index</span></code> and starting from 0.</p>
+<p>For example, to define a sine wave signal at 100 kHz and sampling interval of 1 microsecond,</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">utkit</span>
+
+<span class="n">Ts</span> <span class="o">=</span> <span class="mf">1e-6</span>
+<span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="o">*</span><span class="n">Ts</span>
+<span class="n">s</span> <span class="o">=</span> <span class="n">utkit</span><span class="o">.</span><span class="n">Signal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">*</span><span class="mf">100e3</span><span class="o">*</span><span class="n">t</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>the last line which calls the constructor of <a class="reference internal" href="#utkit.Signal" title="utkit.Signal"><code class="xref py py-class docutils literal"><span class="pre">Signal</span></code></a> is also equivalent to:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">s</span> <span class="o">=</span> <span class="n">utkit</span><span class="o">.</span><span class="n">Signal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">*</span><span class="mf">100e3</span><span class="o">*</span><span class="n">t</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="n">Ts</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The class <a class="reference internal" href="#utkit.Signal" title="utkit.Signal"><code class="xref py py-class docutils literal"><span class="pre">Signal</span></code></a> provides various methods for signal reshaping, transforms,
+and feature extraction.</p>
+</dd></dl>
+
+<div class="section" id="reshaping">
+<h2>Reshaping<a class="headerlink" href="#reshaping" title="Permalink to this headline">¶</a></h2>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.__call__.html#utkit.Signal.__call__" title="utkit.Signal.__call__"><code class="xref py py-obj docutils literal"><span class="pre">__call__</span></code></a>([key,&nbsp;ts])</td>
+<td>Make the Signal act like a function, where given index values are computed using an interpolant, and do not necessarily require to be at one of the current sample points.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal.remove_mean.html#utkit.Signal.remove_mean" title="utkit.Signal.remove_mean"><code class="xref py py-obj docutils literal"><span class="pre">remove_mean</span></code></a>()</td>
+<td>Subtracts the mean of the signal.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.window.html#utkit.Signal.window" title="utkit.Signal.window"><code class="xref py py-obj docutils literal"><span class="pre">window</span></code></a>([index1,&nbsp;index2,&nbsp;is_positional,&nbsp;...])</td>
+<td>Applies a window to the signal within a given time range.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal.filter_freq.html#utkit.Signal.filter_freq" title="utkit.Signal.filter_freq"><code class="xref py py-obj docutils literal"><span class="pre">filter_freq</span></code></a>(cutoff[,&nbsp;option,&nbsp;win_fcn])</td>
+<td>Applies a frequency domain filter to the signal.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.normalize.html#utkit.Signal.normalize" title="utkit.Signal.normalize"><code class="xref py py-obj docutils literal"><span class="pre">normalize</span></code></a>([option])</td>
+<td>Normalizes the signal according to a given option.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal.segment.html#utkit.Signal.segment" title="utkit.Signal.segment"><code class="xref py py-obj docutils literal"><span class="pre">segment</span></code></a>(thres,&nbsp;pulse_width[,&nbsp;win_fcn])</td>
+<td>Segments the signal into a collection of signals, with each item in the collection, representing the signal within a given time window.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.operate.html#utkit.Signal.operate" title="utkit.Signal.operate"><code class="xref py py-obj docutils literal"><span class="pre">operate</span></code></a>([option])</td>
+<td>This is a convenience function for common operations on signals.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="transforms">
+<h2>Transforms<a class="headerlink" href="#transforms" title="Permalink to this headline">¶</a></h2>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.coherence.html#utkit.Signal.coherence" title="utkit.Signal.coherence"><code class="xref py py-obj docutils literal"><span class="pre">coherence</span></code></a>(other,&nbsp;width[,&nbsp;overlap])</td>
+<td>Compute the short-time correlation coefficient of the signal.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal.fft.html#utkit.Signal.fft" title="utkit.Signal.fft"><code class="xref py py-obj docutils literal"><span class="pre">fft</span></code></a>([nfft,&nbsp;ssb])</td>
+<td>Computes the Fast Fourier transform of the signal using <a class="reference external" href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.fftpack.fft.html#scipy.fftpack.fft" title="(in SciPy v0.18.1)"><code class="xref py py-func docutils literal"><span class="pre">scipy.fftpack.fft()</span></code></a> function.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.psd.html#utkit.Signal.psd" title="utkit.Signal.psd"><code class="xref py py-obj docutils literal"><span class="pre">psd</span></code></a>(width[,&nbsp;overlap])</td>
+<td>Computes the periodogram of the signal.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal.spectrogram.html#utkit.Signal.spectrogram" title="utkit.Signal.spectrogram"><code class="xref py py-obj docutils literal"><span class="pre">spectrogram</span></code></a>(width[,&nbsp;overlap])</td>
+<td>Computes the spectrogram (short-time Fourier transform) of the signal.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="features">
+<h2>Features<a class="headerlink" href="#features" title="Permalink to this headline">¶</a></h2>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.bandwidth.html#utkit.Signal.bandwidth" title="utkit.Signal.bandwidth"><code class="xref py py-obj docutils literal"><span class="pre">bandwidth</span></code></a>([threshold,&nbsp;nfft])</td>
+<td>Computes the bandwidth of the signal by finding the range of frequencies where the signal is above a given threshold.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal.center_frequency.html#utkit.Signal.center_frequency" title="utkit.Signal.center_frequency"><code class="xref py py-obj docutils literal"><span class="pre">center_frequency</span></code></a>([threshold,&nbsp;nfft])</td>
+<td>Computes the center frequency of the signal, which is the mean of the bandwidth limits.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.energy.html#utkit.Signal.energy" title="utkit.Signal.energy"><code class="xref py py-obj docutils literal"><span class="pre">energy</span></code></a>([option])</td>
+<td>Computes the energy of the given waveform in the specified domain.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal.limits.html#utkit.Signal.limits" title="utkit.Signal.limits"><code class="xref py py-obj docutils literal"><span class="pre">limits</span></code></a>([threshold])</td>
+<td>Computes the index limits where the signal first goes above a given threshold, and where it last goes below this threshold.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.maxof.html#utkit.Signal.maxof" title="utkit.Signal.maxof"><code class="xref py py-obj docutils literal"><span class="pre">maxof</span></code></a>([option])</td>
+<td>Computes the maximum of the signal according to a given method.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal.peak_frequency.html#utkit.Signal.peak_frequency" title="utkit.Signal.peak_frequency"><code class="xref py py-obj docutils literal"><span class="pre">peak_frequency</span></code></a>([threshold,&nbsp;nfft])</td>
+<td>Computes the peak frequency of the signal.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.tof.html#utkit.Signal.tof" title="utkit.Signal.tof"><code class="xref py py-obj docutils literal"><span class="pre">tof</span></code></a>([method])</td>
+<td>Computes the time of flight relative to another signal.</td>
+</tr>
+</tbody>
+</table>
+<p>See <a class="reference external" href="http://pandas.pydata.org/pandas-docs/version/0.18.0/generated/pandas.Series.html#pandas.Series" title="(in pandas v0.18.0)"><code class="xref py py-class docutils literal"><span class="pre">pandas.Series</span></code></a> for more information about using the base class library, including
+tutorials and additional methods that are very useful to use in conjunction with this library.</p>
+</div>
+<div class="section" id="attributes">
+<h2>Attributes<a class="headerlink" href="#attributes" title="Permalink to this headline">¶</a></h2>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.extent.html#utkit.Signal.extent" title="utkit.Signal.extent"><code class="xref py py-obj docutils literal"><span class="pre">extent</span></code></a></td>
+<td>Get the signal index extent.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal.fs.html#utkit.Signal.fs" title="utkit.Signal.fs"><code class="xref py py-obj docutils literal"><span class="pre">fs</span></code></a></td>
+<td>Get the signal sampling frequency.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.ts.html#utkit.Signal.ts" title="utkit.Signal.ts"><code class="xref py py-obj docutils literal"><span class="pre">ts</span></code></a></td>
+<td>Get the signal sampling period.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">utkit.Signal</a><ul>
+<li><a class="reference internal" href="#reshaping">Reshaping</a></li>
+<li><a class="reference internal" href="#transforms">Transforms</a></li>
+<li><a class="reference internal" href="#features">Features</a></li>
+<li><a class="reference internal" href="#attributes">Attributes</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="../index.html"
+                        title="previous chapter">UTkit Documentation</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="generated/utkit.Signal.__call__.html"
+                        title="next chapter">utkit.Signal.__call__</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/generated/utkit.Signal.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="generated/utkit.Signal.__call__.html" title="utkit.Signal.__call__"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="../index.html" title="UTkit Documentation"
+             >previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../index.html">UTkit 0.2</a> &#187;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, Gerges Dib.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4.6.
+    </div>
+  </body>
+</html>

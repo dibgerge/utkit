@@ -1,0 +1,476 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>utkit.signal3d &#8212; UTkit 0.2</title>
+    
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="UTkit 0.2" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../../index.html">UTkit 0.2</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for utkit.signal3d</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy.signal</span> <span class="k">import</span> <span class="n">hilbert</span>
+
+
+<div class="viewcode-block" id="Signal3D"><a class="viewcode-back" href="../../generated/utkit.Signal3D.html#utkit.Signal3D">[docs]</a><span class="k">class</span> <span class="nc">Signal3D</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">Panel</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Represents data from raster scans. Each point is represented by its 2-D coordinates</span>
+<span class="sd">    (X, Y), and contains a time series signal with time base t. By convention, the last axis is</span>
+<span class="sd">    reserved for the time signals, and the first two axes compose the (X,Y) pairs.</span>
+
+<span class="sd">    Since this is a specialized Ultrasound library, we make the following convention:</span>
+<span class="sd">     * axis 0: The scan direction along the x-axis.</span>
+<span class="sd">     * axis 1: The scan direction along the y-axis.</span>
+<span class="sd">     * axis 2: The time series signals.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">major_axis</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">minor_axis</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="n">items</span><span class="p">,</span> <span class="n">major_axis</span><span class="o">=</span><span class="n">major_axis</span><span class="p">,</span> <span class="n">minor_axis</span><span class="o">=</span><span class="n">minor_axis</span><span class="p">,</span>
+                         <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">items</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">major_axis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">major_axis</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">minor_axis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">minor_axis</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">axes</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">ax</span><span class="o">.</span><span class="n">is_monotonic_increasing</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Indices along all dimensions should be monotonically &#39;</span>
+                                 <span class="s1">&#39;increasing. &#39;</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">_constructor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">Signal3D</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">_constructor_sliced</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">.signal2d</span> <span class="k">import</span> <span class="n">Signal2D</span>
+        <span class="k">return</span> <span class="n">Signal2D</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_panel</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">pnl</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">cls</span><span class="p">(</span><span class="n">pnl</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="n">pnl</span><span class="o">.</span><span class="n">items</span><span class="p">,</span> <span class="n">major_axis</span><span class="o">=</span><span class="n">pnl</span><span class="o">.</span><span class="n">major_axis</span><span class="p">,</span>
+                   <span class="n">minor_axis</span><span class="o">=</span><span class="n">pnl</span><span class="o">.</span><span class="n">minor_axis</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Signal3D.operate"><a class="viewcode-back" href="../../generated/generated/utkit.Signal3D.operate.html#utkit.Signal3D.operate">[docs]</a>    <span class="k">def</span> <span class="nf">operate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Operate on the signal along a given axis.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        option : string/char, optional</span>
+<span class="sd">            The possible options are (combined options are allowed):</span>
+
+<span class="sd">             +--------------------+--------------------------------------+</span>
+<span class="sd">             | *option*           | Meaning                              |</span>
+<span class="sd">             +====================+======================================+</span>
+<span class="sd">             | &#39;&#39; *(Default)*     | Return the raw signal                |</span>
+<span class="sd">             +--------------------+--------------------------------------+</span>
+<span class="sd">             | &#39;n&#39;                | normalized signal                    |</span>
+<span class="sd">             +--------------------+--------------------------------------+</span>
+<span class="sd">             | &#39;d&#39;                | decibel value                        |</span>
+<span class="sd">             +--------------------+--------------------------------------+</span>
+
+<span class="sd">        axis : int, optional</span>
+<span class="sd">            Only used in the case option specified &#39;e&#39; for envelop. Specifies along which axis to</span>
+<span class="sd">            compute the envelop.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        : Signal3D</span>
+<span class="sd">            The modified Signal3D.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">axis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_axis_number</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
+        <span class="n">yout</span> <span class="o">=</span> <span class="bp">self</span>
+        <span class="k">if</span> <span class="s1">&#39;e&#39;</span> <span class="ow">in</span> <span class="n">option</span><span class="p">:</span>
+            <span class="n">yout</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">hilbert</span><span class="p">(</span><span class="n">yout</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="n">axis</span><span class="p">))</span>
+        <span class="k">if</span> <span class="s1">&#39;n&#39;</span> <span class="ow">in</span> <span class="n">option</span><span class="p">:</span>
+            <span class="n">yout</span> <span class="o">=</span> <span class="n">yout</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">yout</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+        <span class="k">if</span> <span class="s1">&#39;d&#39;</span> <span class="ow">in</span> <span class="n">option</span><span class="p">:</span>
+            <span class="n">yout</span> <span class="o">=</span> <span class="mi">20</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">yout</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">Signal3D</span><span class="p">(</span><span class="n">yout</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">,</span> <span class="n">major_axis</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">major_axis</span><span class="p">,</span>
+                        <span class="n">minor_axis</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">minor_axis</span><span class="p">)</span></div>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_get_other_axes</span><span class="p">(</span><span class="n">axis</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">setdiff1d</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">axis</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_axes_numbers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axes</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_axis_number</span><span class="p">(</span><span class="n">axes</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span> <span class="s1">&#39;__len__&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_axis_number</span><span class="p">(</span><span class="n">ax</span><span class="p">)</span> <span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">axes</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">axes</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_cook_axes_args</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">axes</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Internal method to verify that a value is 3-element array. If it is a scalar or</span>
+<span class="sd">        const:`None`, the missing values are selected based on the given *axis*.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ---------</span>
+<span class="sd">        val : float, array_like</span>
+<span class="sd">            This is the value to be tested</span>
+
+<span class="sd">        axes : int</span>
+<span class="sd">            The axis for which the *val* corresponds.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        : 2-tuple</span>
+<span class="sd">            A 2-element array representing the filled *val* with missing axis value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">axes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">axes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span> <span class="s1">&#39;__len__&#39;</span><span class="p">):</span>
+            <span class="n">axes</span> <span class="o">=</span> <span class="p">[</span><span class="n">axes</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="s1">&#39;__len__&#39;</span><span class="p">):</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">axes</span><span class="p">))</span><span class="o">*</span><span class="n">val</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">axes</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;value and axes have different lengths.&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">val</span><span class="p">,</span> <span class="n">axes</span>
+
+<div class="viewcode-block" id="Signal3D.shift_axes"><a class="viewcode-back" href="../../generated/generated/utkit.Signal3D.shift_axes.html#utkit.Signal3D.shift_axes">[docs]</a>    <span class="k">def</span> <span class="nf">shift_axes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shift</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Applies shifting of a given axis.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        shift : float, array_like</span>
+<span class="sd">            The value to shift the axis. If this is an array, it should be the same size as</span>
+<span class="sd">            :attr:`axes`.</span>
+
+<span class="sd">        axes : int, string, array_like, optional</span>
+<span class="sd">            Specifies which of the axes to shift. To shift a single axis, :attr:`axes` is an</span>
+<span class="sd">            int or string representing the dimension or the axis alias name. To shift</span>
+<span class="sd">            multiple axes, :attr:`axes` can be an array of value or string names. If axes is</span>
+<span class="sd">            :const:`None`, all three axes are shifted.</span>
+
+<span class="sd">        inplace : bool</span>
+<span class="sd">            Modify the current instance if True.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        : Signal3D</span>
+<span class="sd">            A copy of Signal3D with shifted axes, or the current instance if :attr:`inplace` is</span>
+<span class="sd">            :const:`True`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">axes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_axes_numbers</span><span class="p">(</span><span class="n">axes</span><span class="p">)</span>
+        <span class="n">shift</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cook_axes_args</span><span class="p">(</span><span class="n">shift</span><span class="p">,</span> <span class="n">axes</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">Signal3D</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">,</span> <span class="n">major_axis</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">major_axis</span><span class="p">,</span>
+                       <span class="n">minor_axis</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">minor_axis</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">inplace</span> <span class="k">else</span> <span class="bp">self</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">ax</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">axes</span><span class="p">):</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">set_axis</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">out</span><span class="o">.</span><span class="n">axes</span><span class="p">[</span><span class="n">ax</span><span class="p">]</span> <span class="o">-</span> <span class="n">shift</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">out</span></div>
+
+<div class="viewcode-block" id="Signal3D.scale_axes"><a class="viewcode-back" href="../../generated/generated/utkit.Signal3D.scale_axes.html#utkit.Signal3D.scale_axes">[docs]</a>    <span class="k">def</span> <span class="nf">scale_axes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scale</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Scale axes by a given amount.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        scale : float, array_like</span>
+<span class="sd">            The amount to scale the axes. If :attr:`scale` is an array, it should be the same</span>
+<span class="sd">            size as :attr:`axes`.</span>
+
+<span class="sd">        axes : int, string, array_like, optional</span>
+<span class="sd">            Specifies which of the axes to shift. To shift a single axis, :attr:`axes` is an</span>
+<span class="sd">            int or string representing the dimension or the axis alias name. To shift</span>
+<span class="sd">            multiple axes, :attr:`axes` can be an array of value or string names. If axes is</span>
+<span class="sd">            :const:`None`, all three axes are shifted.</span>
+
+<span class="sd">        inplace : bool</span>
+<span class="sd">            Modify the current instance if True.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        : Signal3D</span>
+<span class="sd">            A copy of Signal3D with scaled axes or the current instance if  :attr:`inplace` is</span>
+<span class="sd">            :const:`True`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">axes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_axes_numbers</span><span class="p">(</span><span class="n">axes</span><span class="p">)</span>
+        <span class="n">scale</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cook_axes_args</span><span class="p">(</span><span class="n">scale</span><span class="p">,</span> <span class="n">axes</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">Signal3D</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">,</span> <span class="n">major_axis</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">major_axis</span><span class="p">,</span>
+                       <span class="n">minor_axis</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">minor_axis</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">inplace</span> <span class="k">else</span> <span class="bp">self</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">ax</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">axes</span><span class="p">):</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">set_axis</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">out</span><span class="o">.</span><span class="n">axes</span><span class="p">[</span><span class="n">ax</span><span class="p">]</span><span class="o">*</span><span class="n">scale</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">out</span></div>
+
+<div class="viewcode-block" id="Signal3D.skew"><a class="viewcode-back" href="../../generated/generated/utkit.Signal3D.skew.html#utkit.Signal3D.skew">[docs]</a>    <span class="k">def</span> <span class="nf">skew</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">angle</span><span class="p">,</span> <span class="n">skew_axis</span><span class="p">,</span> <span class="n">other_axis</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Obtains the values for the axes after skewing by a certain angle, along a given plane.</span>
+<span class="sd">        This method does not change the values of the object, only its axes.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        angle : float</span>
+<span class="sd">            The angle of the skew.</span>
+
+<span class="sd">        skew_axis : int, string</span>
+<span class="sd">            Name of the axis along which to skew the scan.</span>
+
+<span class="sd">        other_axis: int, string</span>
+<span class="sd">            Name of the second axis that forms the plane for skewing.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        x, y : tuple</span>
+<span class="sd">            A tuple representing the two axis value after skewing. Each element in the tuple is a</span>
+<span class="sd">            matrix of shape of the current object along the plane formed by skew and other axis.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">other_axis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_axis_number</span><span class="p">(</span><span class="n">other_axis</span><span class="p">)</span>
+        <span class="n">skew_axis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_axis_number</span><span class="p">(</span><span class="n">skew_axis</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">other_axis</span> <span class="o">==</span> <span class="n">skew_axis</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;other_axis cannot be the same as skew_axis.&#39;</span><span class="p">)</span>
+
+        <span class="n">slice_ax</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_other_axes</span><span class="p">([</span><span class="n">other_axis</span><span class="p">,</span> <span class="n">skew_axis</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">axes</span><span class="p">[</span><span class="n">slice_ax</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">slice_ax</span><span class="p">)</span>
+
+        <span class="n">plane2d_axes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_axes_numbers</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_plane_axes_index</span><span class="p">(</span><span class="n">slice_ax</span><span class="p">))</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">skew</span><span class="p">(</span><span class="n">angle</span><span class="p">,</span> <span class="n">plane2d_axes</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">skew_axis</span><span class="p">),</span> <span class="n">interpolate</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span></div>
+
+<div class="viewcode-block" id="Signal3D.extract"><a class="viewcode-back" href="../../generated/generated/utkit.Signal3D.extract.html#utkit.Signal3D.extract">[docs]</a>    <span class="k">def</span> <span class="nf">extract</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option</span><span class="o">=</span><span class="s1">&#39;max&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extracts a Signal2D according to a given option by slicing along a specified axis.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        option : {&#39;max&#39;, &#39;var&#39;, float} optional</span>
+<span class="sd">            Select the method to find the slice</span>
+<span class="sd">            * &#39;max&#39;: The maximum amplitude along the axis</span>
+<span class="sd">            * &#39;var&#39;: the maximum variance along the axis.</span>
+<span class="sd">            * scalar: A scalar can be specified to select a specific point along the axis</span>
+
+<span class="sd">        axis : scalar/string, optional</span>
+<span class="sd">            The axis along which to extract the slice.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        : Signal2D</span>
+<span class="sd">            A Signal2D object representing the slice.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">axis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_axis_number</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
+        <span class="n">other_axes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_other_axes</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">option</span> <span class="o">==</span> <span class="s1">&#39;max&#39;</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="n">axis</span><span class="o">=</span><span class="n">other_axes</span><span class="p">)</span>
+            <span class="n">option</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">idxmax</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">option</span> <span class="o">==</span> <span class="s1">&#39;var&#39;</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">var</span><span class="p">()</span><span class="o">.</span><span class="n">var</span><span class="p">(),</span> <span class="n">axis</span><span class="o">=</span><span class="n">other_axes</span><span class="p">)</span>
+            <span class="n">option</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">idxmax</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">option</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="n">option</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="n">axis</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Signal3D.dscan"><a class="viewcode-back" href="../../generated/generated/utkit.Signal3D.dscan.html#utkit.Signal3D.dscan">[docs]</a>    <span class="k">def</span> <span class="nf">dscan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option</span><span class="o">=</span><span class="s1">&#39;max&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Convenience method that return D-scans from Ultrasound Testing raster scans.</span>
+<span class="sd">        Slices the raster scan along the y-t axes (i.e. at a given x location).</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        option : {&#39;max&#39;, &#39;var&#39;, float}, optional</span>
+<span class="sd">            Select the method to find the slice</span>
+<span class="sd">            * &#39;max&#39;: The maximum amplitude along the axis</span>
+<span class="sd">            * &#39;var&#39;: the maximum variance along the axis.</span>
+<span class="sd">            * scalar: A scalar can be specified to select a specific point along the axis</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        : Signal2D</span>
+<span class="sd">            Extracted D-scan as a Signal2D object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">extract</span><span class="p">(</span><span class="n">option</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Signal3D.bscan"><a class="viewcode-back" href="../../generated/generated/utkit.Signal3D.bscan.html#utkit.Signal3D.bscan">[docs]</a>    <span class="k">def</span> <span class="nf">bscan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option</span><span class="o">=</span><span class="s1">&#39;max&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Convenience method that return B-scans from Ultrasound Testing raster scans.</span>
+<span class="sd">        Slices the raster scan along the x-t axes (i.e. at a given y location).</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        option : {&#39;max&#39;, &#39;var&#39;, float} optional</span>
+<span class="sd">            Select the method to find the slice</span>
+<span class="sd">            * &#39;max&#39;: The maximum amplitude along the axis</span>
+<span class="sd">            * &#39;var&#39;: the maximum variance along the axis.</span>
+<span class="sd">            * scalar: A scalar can be specified to select a specific point along the axis</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        : Signal2D</span>
+<span class="sd">            Extracted B-scan as a Signal2D object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">extract</span><span class="p">(</span><span class="n">option</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Signal3D.cscan"><a class="viewcode-back" href="../../generated/generated/utkit.Signal3D.cscan.html#utkit.Signal3D.cscan">[docs]</a>    <span class="k">def</span> <span class="nf">cscan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Specialized method for computing the C-Scans from Ultrasound Testing raster scans. This</span>
+<span class="sd">        collapses the time axis and provides a top view of the scan, along the *x-y* axes.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        theta : float</span>
+<span class="sd">            The angle for which to skew the scan. This should be the wave propagation angle. The</span>
+<span class="sd">            c-scan will be the top view after skew by the given angle.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        : Signal2D</span>
+<span class="sd">            The computed C-scan.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">theta</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="n">dx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">skew</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="s1">&#39;z&#39;</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">/=</span> <span class="n">dx</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+        <span class="n">xmin</span><span class="p">,</span> <span class="n">xmax</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">nx</span> <span class="o">=</span> <span class="n">xmax</span> <span class="o">-</span> <span class="n">xmin</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="n">out</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">nx</span><span class="p">))</span>
+        <span class="n">vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">coord</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">xmin</span><span class="p">,</span> <span class="n">xmax</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)):</span>
+            <span class="n">ind0</span><span class="p">,</span> <span class="n">ind1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="n">coord</span><span class="p">)</span>
+            <span class="n">out</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="n">ind1</span><span class="p">,</span> <span class="p">:,</span> <span class="n">ind0</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">Signal2D</span>
+        <span class="k">return</span> <span class="n">Signal2D</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">major_axis</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">xmin</span><span class="p">,</span> <span class="n">xmax</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">dx</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Signal3D.flatten"><a class="viewcode-back" href="../../generated/generated/utkit.Signal3D.flatten.html#utkit.Signal3D.flatten">[docs]</a>    <span class="k">def</span> <span class="nf">flatten</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Flatten an array and its corresponding indices.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        x, t, x, values : numpy.ndarray</span>
+<span class="sd">            A 4-element tuple where each element is a flattened array of the Signal3D, and each</span>
+<span class="sd">            representing a point with coordinates y, t, x and its value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">yv</span><span class="p">,</span> <span class="n">tv</span><span class="p">,</span> <span class="n">xv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Y</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">X</span><span class="p">,</span> <span class="n">indexing</span><span class="o">=</span><span class="s1">&#39;xy&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">yv</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span> <span class="n">tv</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span> <span class="n">xv</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()])</span></div>
+
+    <span class="k">def</span> <span class="nf">align</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="nf">shift</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">periods</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">freq</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s1">&#39;major&#39;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">ts</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The mean sampling interval for each of the axes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">)),</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">major_axis</span><span class="p">)),</span>\
+               <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">minor_axis</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">x</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Convenience property to return X-axis coordinates as ndarray. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="o">.</span><span class="n">values</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">y</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Convenience property to return Y-axis coordinates as ndarray. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">major_axis</span><span class="o">.</span><span class="n">values</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">z</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Convenience property to return t-axis coordinates as ndarray. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">minor_axis</span><span class="o">.</span><span class="n">values</span></div>
+
+<span class="n">Signal3D</span><span class="o">.</span><span class="n">_setup_axes</span><span class="p">(</span><span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;items&#39;</span><span class="p">,</span> <span class="s1">&#39;major_axis&#39;</span><span class="p">,</span> <span class="s1">&#39;minor_axis&#39;</span><span class="p">],</span> <span class="n">info_axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                     <span class="n">stat_axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">aliases</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;major&#39;</span><span class="p">:</span> <span class="s1">&#39;major_axis&#39;</span><span class="p">,</span>
+                                           <span class="s1">&#39;minor&#39;</span><span class="p">:</span> <span class="s1">&#39;minor_axis&#39;</span><span class="p">,</span>
+                                           <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="s1">&#39;items&#39;</span><span class="p">,</span>
+                                           <span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="s1">&#39;major_axis&#39;</span><span class="p">,</span>
+                                           <span class="s1">&#39;z&#39;</span><span class="p">:</span> <span class="s1">&#39;minor_axis&#39;</span><span class="p">},</span>
+                     <span class="n">slicers</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;major_axis&#39;</span><span class="p">:</span> <span class="s1">&#39;index&#39;</span><span class="p">,</span>
+                              <span class="s1">&#39;minor_axis&#39;</span><span class="p">:</span> <span class="s1">&#39;columns&#39;</span><span class="p">})</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../../index.html">UTkit 0.2</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, Gerges Dib.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4.6.
+    </div>
+  </body>
+</html>

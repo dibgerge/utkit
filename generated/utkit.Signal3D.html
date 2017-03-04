@@ -1,0 +1,222 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>utkit.Signal3D &#8212; UTkit 0.2</title>
+    
+    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="UTkit 0.2" href="../index.html" />
+    <link rel="next" title="utkit.Signal3D.shift_axes" href="generated/utkit.Signal3D.shift_axes.html" />
+    <link rel="prev" title="utkit.Signal2D.max_point" href="generated/utkit.Signal2D.max_point.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="generated/utkit.Signal3D.shift_axes.html" title="utkit.Signal3D.shift_axes"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="generated/utkit.Signal2D.max_point.html" title="utkit.Signal2D.max_point"
+             accesskey="P">previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../index.html">UTkit 0.2</a> &#187;</li>
+ 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="utkit-signal3d">
+<h1>utkit.Signal3D<a class="headerlink" href="#utkit-signal3d" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
+<dt id="utkit.Signal3D">
+<em class="property">class </em><code class="descclassname">utkit.</code><code class="descname">Signal3D</code><span class="sig-paren">(</span><em>data</em>, <em>items=None</em>, <em>major_axis=None</em>, <em>minor_axis=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/utkit/signal3d.html#Signal3D"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utkit.Signal3D" title="Permalink to this definition">¶</a></dt>
+<dd><p>Represents data from raster scans. Each point is represented by its 2-D coordinates
+(X, Y), and contains a time series signal with time base t. By convention, the last axis is
+reserved for the time signals, and the first two axes compose the (X,Y) pairs.</p>
+<dl class="docutils">
+<dt>Since this is a specialized Ultrasound library, we make the following convention:</dt>
+<dd><ul class="first last simple">
+<li>axis 0: The scan direction along the x-axis.</li>
+<li>axis 1: The scan direction along the y-axis.</li>
+<li>axis 2: The time series signals.</li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<div class="section" id="reshaping">
+<h2>Reshaping<a class="headerlink" href="#reshaping" title="Permalink to this headline">¶</a></h2>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal3D.shift_axes.html#utkit.Signal3D.shift_axes" title="utkit.Signal3D.shift_axes"><code class="xref py py-obj docutils literal"><span class="pre">shift_axes</span></code></a>(shift[,&nbsp;axes,&nbsp;inplace])</td>
+<td>Applies shifting of a given axis.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal3D.scale_axes.html#utkit.Signal3D.scale_axes" title="utkit.Signal3D.scale_axes"><code class="xref py py-obj docutils literal"><span class="pre">scale_axes</span></code></a>(scale[,&nbsp;axes,&nbsp;inplace])</td>
+<td>Scale axes by a given amount.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal3D.skew.html#utkit.Signal3D.skew" title="utkit.Signal3D.skew"><code class="xref py py-obj docutils literal"><span class="pre">skew</span></code></a>(angle,&nbsp;skew_axis,&nbsp;other_axis)</td>
+<td>Obtains the values for the axes after skewing by a certain angle, along a given plane.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal3D.flatten.html#utkit.Signal3D.flatten" title="utkit.Signal3D.flatten"><code class="xref py py-obj docutils literal"><span class="pre">flatten</span></code></a>()</td>
+<td>Flatten an array and its corresponding indices.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal3D.operate.html#utkit.Signal3D.operate" title="utkit.Signal3D.operate"><code class="xref py py-obj docutils literal"><span class="pre">operate</span></code></a>([option,&nbsp;axis])</td>
+<td>Operate on the signal along a given axis.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="transforms">
+<h2>Transforms<a class="headerlink" href="#transforms" title="Permalink to this headline">¶</a></h2>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal3D.bscan.html#utkit.Signal3D.bscan" title="utkit.Signal3D.bscan"><code class="xref py py-obj docutils literal"><span class="pre">bscan</span></code></a>([option])</td>
+<td>Convenience method that return B-scans from Ultrasound Testing raster scans.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal3D.cscan.html#utkit.Signal3D.cscan" title="utkit.Signal3D.cscan"><code class="xref py py-obj docutils literal"><span class="pre">cscan</span></code></a>([theta])</td>
+<td>Specialized method for computing the C-Scans from Ultrasound Testing raster scans.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal3D.dscan.html#utkit.Signal3D.dscan" title="utkit.Signal3D.dscan"><code class="xref py py-obj docutils literal"><span class="pre">dscan</span></code></a>([option])</td>
+<td>Convenience method that return D-scans from Ultrasound Testing raster scans.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal3D.extract.html#utkit.Signal3D.extract" title="utkit.Signal3D.extract"><code class="xref py py-obj docutils literal"><span class="pre">extract</span></code></a>([option,&nbsp;axis])</td>
+<td>Extracts a Signal2D according to a given option by slicing along a specified axis.</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal3D.x.html#utkit.Signal3D.x" title="utkit.Signal3D.x"><code class="xref py py-obj docutils literal"><span class="pre">x</span></code></a></td>
+<td>Convenience property to return X-axis coordinates as ndarray.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal3D.ts.html#utkit.Signal3D.ts" title="utkit.Signal3D.ts"><code class="xref py py-obj docutils literal"><span class="pre">ts</span></code></a></td>
+<td>The mean sampling interval for each of the axes.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal3D.y.html#utkit.Signal3D.y" title="utkit.Signal3D.y"><code class="xref py py-obj docutils literal"><span class="pre">y</span></code></a></td>
+<td>Convenience property to return Y-axis coordinates as ndarray.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal3D.axes.html#utkit.Signal3D.axes" title="utkit.Signal3D.axes"><code class="xref py py-obj docutils literal"><span class="pre">axes</span></code></a></td>
+<td>Return index label(s) of the internal NDFrame</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal3D.z.html#utkit.Signal3D.z" title="utkit.Signal3D.z"><code class="xref py py-obj docutils literal"><span class="pre">z</span></code></a></td>
+<td>Convenience property to return t-axis coordinates as ndarray.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">utkit.Signal3D</a><ul>
+<li><a class="reference internal" href="#reshaping">Reshaping</a></li>
+<li><a class="reference internal" href="#transforms">Transforms</a><ul>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="generated/utkit.Signal2D.max_point.html"
+                        title="previous chapter">utkit.Signal2D.max_point</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="generated/utkit.Signal3D.shift_axes.html"
+                        title="next chapter">utkit.Signal3D.shift_axes</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/generated/utkit.Signal3D.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="generated/utkit.Signal3D.shift_axes.html" title="utkit.Signal3D.shift_axes"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="generated/utkit.Signal2D.max_point.html" title="utkit.Signal2D.max_point"
+             >previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../index.html">UTkit 0.2</a> &#187;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, Gerges Dib.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4.6.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>utkit.Signal2D &#8212; UTkit 0.2</title>
+    
+    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="UTkit 0.2" href="../index.html" />
+    <link rel="next" title="utkit.Signal2D.__call__" href="generated/utkit.Signal2D.__call__.html" />
+    <link rel="prev" title="utkit.Signal.ts" href="generated/utkit.Signal.ts.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="generated/utkit.Signal2D.__call__.html" title="utkit.Signal2D.__call__"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="generated/utkit.Signal.ts.html" title="utkit.Signal.ts"
+             accesskey="P">previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../index.html">UTkit 0.2</a> &#187;</li>
+ 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="utkit-signal2d">
+<h1>utkit.Signal2D<a class="headerlink" href="#utkit-signal2d" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
+<dt id="utkit.Signal2D">
+<em class="property">class </em><code class="descclassname">utkit.</code><code class="descname">Signal2D</code><span class="sig-paren">(</span><em>data=None</em>, <em>index=None</em>, <em>columns=None</em>, <em>dtype=None</em>, <em>copy=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/utkit/signal2d.html#Signal2D"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utkit.Signal2D" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extends <a class="reference external" href="http://pandas.pydata.org/pandas-docs/version/0.18.0/generated/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v0.18.0)"><code class="xref py py-class docutils literal"><span class="pre">pandas.DataFrame</span></code></a> class to support operations commonly required
+in radio frequency signals, and especially in ultrasonics. The axis convention used is:</p>
+<blockquote>
+<div><ul class="simple">
+<li><strong>Axis 1 (columns)</strong>: <em>X</em>-direction</li>
+<li><strong>Axis 0 (index)</strong>: <em>Y</em>-direction</li>
+</ul>
+</div></blockquote>
+<p>For example, in the context of ultrasonic inspection, the <em>X</em>-direction would represent
+the spatial line scan, and the <em>Y</em>-direction represents the signal time base, which can
+be scaled to represent the ultrasonic beam depth through the material.</p>
+<p>The class constructor is similar as that of <a class="reference external" href="http://pandas.pydata.org/pandas-docs/version/0.18.0/generated/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v0.18.0)"><code class="xref py py-class docutils literal"><span class="pre">pandas.DataFrame</span></code></a> with the added
+option of specifying only the sampling intervals along the <em>X</em> and <em>Y</em> directions.
+Thus, if <em>index</em> and/or <em>columns</em> are scalars, which <em>data</em> is a 2-D array, then
+the Signal2D basis are constructed starting from 0 at the given sampling intervals.</p>
+<p>If data input is a dictionary, usual rules from <a class="reference external" href="http://pandas.pydata.org/pandas-docs/version/0.18.0/generated/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v0.18.0)"><code class="xref py py-class docutils literal"><span class="pre">pandas.DataFrame</span></code></a> apply, but index
+can still be a scalar specifying the sampling interval.</p>
+</dd></dl>
+
+<div class="section" id="reshaping">
+<h2>Reshaping<a class="headerlink" href="#reshaping" title="Permalink to this headline">¶</a></h2>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal2D.__call__.html#utkit.Signal2D.__call__" title="utkit.Signal2D.__call__"><code class="xref py py-obj docutils literal"><span class="pre">__call__</span></code></a>([index,&nbsp;columns])</td>
+<td>Interpolate the axes.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal2D.remove_mean.html#utkit.Signal2D.remove_mean" title="utkit.Signal2D.remove_mean"><code class="xref py py-obj docutils literal"><span class="pre">remove_mean</span></code></a>([axes])</td>
+<td>Removes the mean along a given axis.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal2D.window.html#utkit.Signal2D.window" title="utkit.Signal2D.window"><code class="xref py py-obj docutils literal"><span class="pre">window</span></code></a>([index1,&nbsp;index2,&nbsp;axes,&nbsp;win_fcn])</td>
+<td>Applies a window to the signal within a given time range.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal2D.filter_freq.html#utkit.Signal2D.filter_freq" title="utkit.Signal2D.filter_freq"><code class="xref py py-obj docutils literal"><span class="pre">filter_freq</span></code></a>([low_freq,&nbsp;high_freq,&nbsp;axes,&nbsp;win_fcn])</td>
+<td>Applies a filter in the frequency domain.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal2D.scale_axes.html#utkit.Signal2D.scale_axes" title="utkit.Signal2D.scale_axes"><code class="xref py py-obj docutils literal"><span class="pre">scale_axes</span></code></a>(scale[,&nbsp;axes])</td>
+<td>Scales a given axis (or both) by a given amount.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal2D.shift_axes.html#utkit.Signal2D.shift_axes" title="utkit.Signal2D.shift_axes"><code class="xref py py-obj docutils literal"><span class="pre">shift_axes</span></code></a>(shift[,&nbsp;axes])</td>
+<td>Shifts an axis (or both axis) by a specified amount.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal2D.pad.html#utkit.Signal2D.pad" title="utkit.Signal2D.pad"><code class="xref py py-obj docutils literal"><span class="pre">pad</span></code></a>(extent[,&nbsp;axes,&nbsp;fill,&nbsp;position])</td>
+<td>Adds padding along the given axes.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal2D.roll.html#utkit.Signal2D.roll" title="utkit.Signal2D.roll"><code class="xref py py-obj docutils literal"><span class="pre">roll</span></code></a>(value[,&nbsp;axes])</td>
+<td>Circular shift by a given value, along a given axis.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal2D.flip.html#utkit.Signal2D.flip" title="utkit.Signal2D.flip"><code class="xref py py-obj docutils literal"><span class="pre">flip</span></code></a>([axes])</td>
+<td>Flips the values without flipping corresponding X/Y-axes coordinates.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal2D.skew.html#utkit.Signal2D.skew" title="utkit.Signal2D.skew"><code class="xref py py-obj docutils literal"><span class="pre">skew</span></code></a>(angle[,&nbsp;axes,&nbsp;interpolate,&nbsp;ts])</td>
+<td>Applies a skew transformation on the data.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal2D.flatten.html#utkit.Signal2D.flatten" title="utkit.Signal2D.flatten"><code class="xref py py-obj docutils literal"><span class="pre">flatten</span></code></a>()</td>
+<td>Flattens the Signal2D to give coordinates (X, Y, Values).</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal2D.operate.html#utkit.Signal2D.operate" title="utkit.Signal2D.operate"><code class="xref py py-obj docutils literal"><span class="pre">operate</span></code></a>([option,&nbsp;axis])</td>
+<td>Returns the signal according to a given option.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal2D.reset_rate.html#utkit.Signal2D.reset_rate" title="utkit.Signal2D.reset_rate"><code class="xref py py-obj docutils literal"><span class="pre">reset_rate</span></code></a>(ts[,&nbsp;axes])</td>
+<td>Re-samples the Signal to be of a specified sampling rate.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="transforms">
+<h2>Transforms<a class="headerlink" href="#transforms" title="Permalink to this headline">¶</a></h2>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal2D.fft.html#utkit.Signal2D.fft" title="utkit.Signal2D.fft"><code class="xref py py-obj docutils literal"><span class="pre">fft</span></code></a>([ssb,&nbsp;axes,&nbsp;shape])</td>
+<td>Computes the Fourier transform in two dimensions, or along a specified axis.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal2D.extract.html#utkit.Signal2D.extract" title="utkit.Signal2D.extract"><code class="xref py py-obj docutils literal"><span class="pre">extract</span></code></a>([axis,&nbsp;option])</td>
+<td>Extracts a 1-D Signal depending on the given option.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="features">
+<h2>Features<a class="headerlink" href="#features" title="Permalink to this headline">¶</a></h2>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal2D.max_point.html#utkit.Signal2D.max_point" title="utkit.Signal2D.max_point"><code class="xref py py-obj docutils literal"><span class="pre">max_point</span></code></a>()</td>
+<td>Gets the (x, y) coordinates of the points that has the maximum amplitude.</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+</tbody>
+</table>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">utkit.Signal2D</a><ul>
+<li><a class="reference internal" href="#reshaping">Reshaping</a></li>
+<li><a class="reference internal" href="#transforms">Transforms</a></li>
+<li><a class="reference internal" href="#features">Features</a><ul>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="generated/utkit.Signal.ts.html"
+                        title="previous chapter">utkit.Signal.ts</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="generated/utkit.Signal2D.__call__.html"
+                        title="next chapter">utkit.Signal2D.__call__</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/generated/utkit.Signal2D.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="generated/utkit.Signal2D.__call__.html" title="utkit.Signal2D.__call__"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="generated/utkit.Signal.ts.html" title="utkit.Signal.ts"
+             >previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../index.html">UTkit 0.2</a> &#187;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, Gerges Dib.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4.6.
+    </div>
+  </body>
+</html>

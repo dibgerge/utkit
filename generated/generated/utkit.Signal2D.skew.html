@@ -1,0 +1,166 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>utkit.Signal2D.skew &#8212; UTkit 0.2</title>
+    
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="UTkit 0.2" href="../../index.html" />
+    <link rel="up" title="utkit.Signal2D" href="../utkit.Signal2D.html" />
+    <link rel="next" title="utkit.Signal2D.flatten" href="utkit.Signal2D.flatten.html" />
+    <link rel="prev" title="utkit.Signal2D.flip" href="utkit.Signal2D.flip.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal2D.flatten.html" title="utkit.Signal2D.flatten"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal2D.flip.html" title="utkit.Signal2D.flip"
+             accesskey="P">previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../../index.html">UTkit 0.2</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../utkit.Signal2D.html" accesskey="U">utkit.Signal2D</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="utkit-signal2d-skew">
+<h1>utkit.Signal2D.skew<a class="headerlink" href="#utkit-signal2d-skew" title="Permalink to this headline">¶</a></h1>
+<dl class="method">
+<dt id="utkit.Signal2D.skew">
+<code class="descclassname">Signal2D.</code><code class="descname">skew</code><span class="sig-paren">(</span><em>angle</em>, <em>axes=1</em>, <em>interpolate=False</em>, <em>ts=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/utkit/signal2d.html#Signal2D.skew"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utkit.Signal2D.skew" title="Permalink to this definition">¶</a></dt>
+<dd><p>Applies a skew transformation on the data.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>angle</strong> (<em>float, array_like</em>) &#8211; The angle to skew the Scan2D coordinates. If <em>angle</em> is an array, it should
+have the same size as <em>axes</em>. If it is a scalar, the angle will be applied to all
+specified <em>axes</em></li>
+<li><strong>axes</strong> (<em>integer, str, optional</em>) &#8211; The axis along which to skew. If <em>axes</em> is set to <code class="xref py py-const docutils literal"><span class="pre">None</span></code>, then both axes are
+skewed.</li>
+<li><strong>interpolate</strong> (<em>bool, optional</em>) &#8211; <p>If const:<cite>True</cite>, realign the skewed axes on a regular grid, and use interpolation to
+recompute the values of the Signal2D at the new regular grid. The new grid will be
+computed to span the new range of the axes.</p>
+<p>Otherwise, no interpolation will be formed, however the grid will be similar to the
+current object grid. That is, the skewed grid coordinates are reset to match the
+nearest neighbor from the original grid.</p>
+</li>
+<li><strong>ts</strong> (<em>float, array_like, optional</em>) &#8211; Only required if <em>interpolate</em> is set to <code class="xref py py-const docutils literal"><span class="pre">True</span></code>. Specifies the sampling
+interval for the new regular grid used in the interpolation. If not specified,
+then by default, the current sampling intervals of the Signal2D object will be used.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><ul class="simple">
+<li><strong>signal2D</strong> (<em>Signal2D</em>) &#8211; If <em>interpolate</em> is <code class="xref py py-const docutils literal"><span class="pre">True</span></code>, then a new Signal2D object is returned,
+after interpolation onto a regular grid.</li>
+<li><strong>X, Y, val</strong> (<em>tuple</em>) &#8211; If <em>interpolate</em> is <code class="xref py py-const docutils literal"><span class="pre">False</span></code>, then a tuple is returned, composed of the the
+new coordinates (X, Y), where now X and Y are 2-D matrices with same shape as the
+dataframe. The values are also returned for convenience, but they are the same as the
+current Signal2D object.</li>
+</ul>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="utkit.Signal2D.flip.html"
+                        title="previous chapter">utkit.Signal2D.flip</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="utkit.Signal2D.flatten.html"
+                        title="next chapter">utkit.Signal2D.flatten</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/generated/generated/utkit.Signal2D.skew.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal2D.flatten.html" title="utkit.Signal2D.flatten"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal2D.flip.html" title="utkit.Signal2D.flip"
+             >previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../../index.html">UTkit 0.2</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../utkit.Signal2D.html" >utkit.Signal2D</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, Gerges Dib.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4.6.
+    </div>
+  </body>
+</html>

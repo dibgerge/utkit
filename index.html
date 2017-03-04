@@ -1,0 +1,134 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>UTkit Documentation &#8212; UTkit 0.2</title>
+    
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="UTkit 0.2" href="#" />
+    <link rel="next" title="utkit.Signal" href="generated/utkit.Signal.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="generated/utkit.Signal.html" title="utkit.Signal"
+             accesskey="N">next</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="#">UTkit 0.2</a> &#187;</li>
+ 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="module-utkit">
+<span id="utkit-documentation"></span><h1>UTkit Documentation<a class="headerlink" href="#module-utkit" title="Permalink to this headline">¶</a></h1>
+<p><a class="reference internal" href="#module-utkit" title="utkit"><code class="xref py py-mod docutils literal"><span class="pre">utkit</span></code></a> extends the data structures in the popular library <a class="reference external" href="http://pandas.pydata.org/pandas-docs/version/0.18.0/index.html#module-pandas" title="(in pandas v0.18.0)"><code class="xref py py-mod docutils literal"><span class="pre">pandas</span></code></a> in order to
+support short time signals generally encountered in wave propagation measurements. The main
+purpose of this library is to implement signal processing procedures for <em>signal shaping</em>,
+<em>transforms</em>, and <em>feature extraction</em> in a simple manner. All the while, keeping track and managing
+signal values and their corresponding indices (time/space values).</p>
+<p>The library supports three data structures:</p>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal.html#utkit.Signal" title="utkit.Signal"><code class="xref py py-obj docutils literal"><span class="pre">Signal</span></code></a></td>
+<td>Represents physical signals, by keeping track of the index (time/space) and corresponding values.</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="generated/utkit.Signal2D.html#utkit.Signal2D" title="utkit.Signal2D"><code class="xref py py-obj docutils literal"><span class="pre">Signal2D</span></code></a></td>
+<td>Extends <a class="reference external" href="http://pandas.pydata.org/pandas-docs/version/0.18.0/generated/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v0.18.0)"><code class="xref py py-class docutils literal"><span class="pre">pandas.DataFrame</span></code></a> class to support operations commonly required in radio frequency signals, and especially in ultrasonics.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="generated/utkit.Signal3D.html#utkit.Signal3D" title="utkit.Signal3D"><code class="xref py py-obj docutils literal"><span class="pre">Signal3D</span></code></a></td>
+<td>Represents data from a raster scan.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Next topic</h4>
+  <p class="topless"><a href="generated/utkit.Signal.html"
+                        title="next chapter">utkit.Signal</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="generated/utkit.Signal.html" title="utkit.Signal"
+             >next</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="#">UTkit 0.2</a> &#187;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, Gerges Dib.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4.6.
+    </div>
+  </body>
+</html>

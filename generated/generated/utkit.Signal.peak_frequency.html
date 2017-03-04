@@ -1,0 +1,151 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>utkit.Signal.peak_frequency &#8212; UTkit 0.2</title>
+    
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="UTkit 0.2" href="../../index.html" />
+    <link rel="up" title="utkit.Signal" href="../utkit.Signal.html" />
+    <link rel="next" title="utkit.Signal.tof" href="utkit.Signal.tof.html" />
+    <link rel="prev" title="utkit.Signal.maxof" href="utkit.Signal.maxof.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.tof.html" title="utkit.Signal.tof"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.maxof.html" title="utkit.Signal.maxof"
+             accesskey="P">previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../../index.html">UTkit 0.2</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../utkit.Signal.html" accesskey="U">utkit.Signal</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="utkit-signal-peak-frequency">
+<h1>utkit.Signal.peak_frequency<a class="headerlink" href="#utkit-signal-peak-frequency" title="Permalink to this headline">¶</a></h1>
+<dl class="method">
+<dt id="utkit.Signal.peak_frequency">
+<code class="descclassname">Signal.</code><code class="descname">peak_frequency</code><span class="sig-paren">(</span><em>threshold=-6</em>, <em>nfft=None</em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/utkit/signal.html#Signal.peak_frequency"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utkit.Signal.peak_frequency" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes the peak frequency of the signal.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>threshold</strong> (<em>float, optional</em>) &#8211; Threshold value in dB, indicating the noise floor level. This value should be
+negative, as the spectrum is normalized by its maximum values, and thus the maximum
+amplitude is 0 dB. Default is -6 dB.</li>
+<li><strong>nfft</strong> (<em>bool, optional</em>) &#8211; Since this computation is based on the Fourier transform, indicate the number of
+points to be used on computing the FFT.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">The value of the center frequency in Hz.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference external" href="https://docs.python.org/2/library/functions.html#float" title="(in Python v2.7)">float</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="utkit.Signal.maxof.html"
+                        title="previous chapter">utkit.Signal.maxof</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="utkit.Signal.tof.html"
+                        title="next chapter">utkit.Signal.tof</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/generated/generated/utkit.Signal.peak_frequency.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.tof.html" title="utkit.Signal.tof"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.maxof.html" title="utkit.Signal.maxof"
+             >previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../../index.html">UTkit 0.2</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../utkit.Signal.html" >utkit.Signal</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, Gerges Dib.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4.6.
+    </div>
+  </body>
+</html>

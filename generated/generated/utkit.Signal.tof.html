@@ -1,0 +1,157 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>utkit.Signal.tof &#8212; UTkit 0.2</title>
+    
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="UTkit 0.2" href="../../index.html" />
+    <link rel="up" title="utkit.Signal" href="../utkit.Signal.html" />
+    <link rel="next" title="utkit.Signal.extent" href="utkit.Signal.extent.html" />
+    <link rel="prev" title="utkit.Signal.peak_frequency" href="utkit.Signal.peak_frequency.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.extent.html" title="utkit.Signal.extent"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.peak_frequency.html" title="utkit.Signal.peak_frequency"
+             accesskey="P">previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../../index.html">UTkit 0.2</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../utkit.Signal.html" accesskey="U">utkit.Signal</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="utkit-signal-tof">
+<h1>utkit.Signal.tof<a class="headerlink" href="#utkit-signal-tof" title="Permalink to this headline">¶</a></h1>
+<dl class="method">
+<dt id="utkit.Signal.tof">
+<code class="descclassname">Signal.</code><code class="descname">tof</code><span class="sig-paren">(</span><em>method='corr'</em>, <em>*args</em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/utkit/signal.html#Signal.tof"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utkit.Signal.tof" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes the time of flight relative to another signal. Three different methods for
+computing the time of flight are currently supported.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>method</strong> (<em>string, optional</em>) &#8211; <p>The method to be used for computing the signal time of flight. The following methods
+are currently supported:</p>
+<blockquote>
+<div><ul class="simple">
+<li><em>corr</em> : Use a correlation peak to compute the time of flight relative to another
+signal. Another signal should be provided as input for performing the correlation.</li>
+<li><em>max</em> : The maximum value of the signal is used to compute the time of flight.
+This time of flight is relative to the signal&#8217;s time 0.</li>
+<li><em>thresh</em> : Compute the time the signal first crosses a given threshold value. The
+threshold should  be given as argument in dB units. Note that the signal is
+normalized by it&#8217;s maximum for the purpose of finding the threshold crossing,
+thus the maximum dB value is 0. If no threshold is given, the default is -12 dB.</li>
+</ul>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">The computed time of flight, with the same units as the Signal index.</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference external" href="https://docs.python.org/2/library/functions.html#float" title="(in Python v2.7)">float</a></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="utkit.Signal.peak_frequency.html"
+                        title="previous chapter">utkit.Signal.peak_frequency</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="utkit.Signal.extent.html"
+                        title="next chapter">utkit.Signal.extent</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/generated/generated/utkit.Signal.tof.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.extent.html" title="utkit.Signal.extent"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.peak_frequency.html" title="utkit.Signal.peak_frequency"
+             >previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../../index.html">UTkit 0.2</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../utkit.Signal.html" >utkit.Signal</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, Gerges Dib.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4.6.
+    </div>
+  </body>
+</html>

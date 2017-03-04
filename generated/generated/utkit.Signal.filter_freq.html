@@ -1,0 +1,177 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>utkit.Signal.filter_freq &#8212; UTkit 0.2</title>
+    
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="UTkit 0.2" href="../../index.html" />
+    <link rel="up" title="utkit.Signal" href="../utkit.Signal.html" />
+    <link rel="next" title="utkit.Signal.normalize" href="utkit.Signal.normalize.html" />
+    <link rel="prev" title="utkit.Signal.window" href="utkit.Signal.window.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.normalize.html" title="utkit.Signal.normalize"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.window.html" title="utkit.Signal.window"
+             accesskey="P">previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../../index.html">UTkit 0.2</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../utkit.Signal.html" accesskey="U">utkit.Signal</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="utkit-signal-filter-freq">
+<h1>utkit.Signal.filter_freq<a class="headerlink" href="#utkit-signal-filter-freq" title="Permalink to this headline">¶</a></h1>
+<dl class="method">
+<dt id="utkit.Signal.filter_freq">
+<code class="descclassname">Signal.</code><code class="descname">filter_freq</code><span class="sig-paren">(</span><em>cutoff</em>, <em>option='lp'</em>, <em>win_fcn='boxcar'</em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/utkit/signal.html#Signal.filter_freq"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utkit.Signal.filter_freq" title="Permalink to this definition">¶</a></dt>
+<dd><p>Applies a frequency domain filter to the signal.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>cutoff</strong> (<em>float or (2,) tuple</em>) &#8211; The cutoff frequency (Hz) of the filter. This is a scalar value if type
+is <code class="docutils literal"><span class="pre">'lp'</span></code> or <code class="docutils literal"><span class="pre">'hp'</span></code>. When type is <code class="docutils literal"><span class="pre">'bp'</span></code>, cutoff  should be a 2 element list,
+where the first element specifies the lower cutoff frequency, and the second element
+specifies the upper cutoff frequency.</li>
+<li><strong>option</strong> (<em>string, optional</em>) &#8211; <p>The type of filter to be used.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="33%" />
+<col width="67%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head"><em>option</em></th>
+<th class="head">Meaning</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>&#8216;lp&#8217; <em>(Default)</em></td>
+<td>Low-pass filter</td>
+</tr>
+<tr class="row-odd"><td>&#8216;hp&#8217;</td>
+<td>High-pass filter</td>
+</tr>
+<tr class="row-even"><td>&#8216;bp&#8217;</td>
+<td>Band-pass filter</td>
+</tr>
+</tbody>
+</table>
+</li>
+<li><strong>win_fcn</strong> (<em>string, optional</em>) &#8211; Apply a specific window in the frequency domain. See the function
+<a class="reference external" href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.get_window.html#scipy.signal.get_window" title="(in SciPy v0.18.1)"><code class="xref py py-func docutils literal"><span class="pre">scipy.signal.get_window()</span></code></a> for a complete list of available windows, and how to
+pass extra parameters for a specific window function.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">The filtered Signal.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference internal" href="../utkit.Signal.html#utkit.Signal" title="utkit.Signal">Signal</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="utkit.Signal.window.html"
+                        title="previous chapter">utkit.Signal.window</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="utkit.Signal.normalize.html"
+                        title="next chapter">utkit.Signal.normalize</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/generated/generated/utkit.Signal.filter_freq.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.normalize.html" title="utkit.Signal.normalize"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.window.html" title="utkit.Signal.window"
+             >previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../../index.html">UTkit 0.2</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../utkit.Signal.html" >utkit.Signal</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, Gerges Dib.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4.6.
+    </div>
+  </body>
+</html>

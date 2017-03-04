@@ -1,0 +1,163 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>utkit.Signal.window &#8212; UTkit 0.2</title>
+    
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="UTkit 0.2" href="../../index.html" />
+    <link rel="up" title="utkit.Signal" href="../utkit.Signal.html" />
+    <link rel="next" title="utkit.Signal.filter_freq" href="utkit.Signal.filter_freq.html" />
+    <link rel="prev" title="utkit.Signal.remove_mean" href="utkit.Signal.remove_mean.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.filter_freq.html" title="utkit.Signal.filter_freq"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.remove_mean.html" title="utkit.Signal.remove_mean"
+             accesskey="P">previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../../index.html">UTkit 0.2</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../utkit.Signal.html" accesskey="U">utkit.Signal</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="utkit-signal-window">
+<h1>utkit.Signal.window<a class="headerlink" href="#utkit-signal-window" title="Permalink to this headline">¶</a></h1>
+<dl class="method">
+<dt id="utkit.Signal.window">
+<code class="descclassname">Signal.</code><code class="descname">window</code><span class="sig-paren">(</span><em>index1=None</em>, <em>index2=None</em>, <em>is_positional=False</em>, <em>win_fcn='boxcar'</em>, <em>fftbins=False</em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/utkit/signal.html#Signal.window"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utkit.Signal.window" title="Permalink to this definition">¶</a></dt>
+<dd><p>Applies a window to the signal within a given time range.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>index1</strong> (<em>float or int, optional</em>) &#8211; The start index/position of the window. Default value is minimum of index.</li>
+<li><strong>index2</strong> (<em>float or int, optional</em>) &#8211; The end index/position of the window. Default value is maximum of index.</li>
+<li><strong>is_positional</strong> (<em>bool, optional</em>) &#8211; Indicates whether the inputs <cite>index1</cite> and <cite>index2</cite> are positional or value
+based. Default is <code class="xref py py-const docutils literal"><span class="pre">False</span></code>, i.e. value based.</li>
+<li><strong>win_fcn</strong> (<em>string/float/tuple, optional</em>) &#8211; The type of window to create. See the function
+<a class="reference external" href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.get_window.html#scipy.signal.get_window" title="(in SciPy v0.18.1)"><code class="xref py py-func docutils literal"><span class="pre">scipy.signal.get_window()</span></code></a> for a complete list of
+available windows, and how to pass extra parameters for a
+specific window function.</li>
+<li><strong>fftbins</strong> (<em>bool, optional</em>) &#8211; If True, then applies a symmetric window with respect to index of value 0.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">The windowed Signal signal.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference internal" href="../utkit.Signal.html#utkit.Signal" title="utkit.Signal">Signal</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">If the window requires no parameters, then <cite>win_fcn</cite> can be a string.
+If the window requires parameters, then <cite>win_fcn</cite> must be a tuple
+with the first argument the string name of the window, and the next
+arguments the needed parameters. If <cite>win_fcn</cite> is a floating point
+number, it is interpreted as the beta parameter of the kaiser window.</p>
+</div>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="utkit.Signal.remove_mean.html"
+                        title="previous chapter">utkit.Signal.remove_mean</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="utkit.Signal.filter_freq.html"
+                        title="next chapter">utkit.Signal.filter_freq</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/generated/generated/utkit.Signal.window.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.filter_freq.html" title="utkit.Signal.filter_freq"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="utkit.Signal.remove_mean.html" title="utkit.Signal.remove_mean"
+             >previous</a> |</li>
+    <!-- <li><a href="http://project.invalid/">Project Homepage</a> &raquo;</li> -->
+    
+        <li class="nav-item nav-item-0"><a href="../../index.html">UTkit 0.2</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../utkit.Signal.html" >utkit.Signal</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, Gerges Dib.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4.6.
+    </div>
+  </body>
+</html>
