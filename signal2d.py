@@ -735,9 +735,9 @@ class Signal2D(pd.DataFrame):
 
         Parameters
         ----------
-        axes : string/int, optional:
+        axes : string/int, optional
             The axis along  which to remove the means. If axis not specified, remove the global
-            mean from the uFrame.
+            mean along all axes.
 
         Returns
         -------

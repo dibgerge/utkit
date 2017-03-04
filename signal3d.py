@@ -14,9 +14,6 @@ class Signal3D(pd.Panel):
      * axis 1: The scan direction along the y-axis.
      * axis 2: The time series signals.
 
-    .. autosummary::
-
-        shift_axis
     """
     def __init__(self, data, items=None, major_axis=None, minor_axis=None, **kwargs):
         super().__init__(data=data, items=items, major_axis=major_axis, minor_axis=minor_axis,
