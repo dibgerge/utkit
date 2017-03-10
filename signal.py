@@ -365,7 +365,7 @@ class Signal(pd.Series):
         """
         if nfft is None:
             nfft = self.size
-        uf = Signal(fftshift(fft(self, n=nfft)), index=fftshift(fftfreq(nfft, self.ts)))
+        uf = Signal(fftshift(fft(self.values, n=nfft)), index=fftshift(fftfreq(nfft, self.ts)))
         return uf[uf.index >= 0] if ssb else uf
 
     def limits(self, threshold=-20):
@@ -397,6 +397,34 @@ class Signal(pd.Series):
             y1, y2 = senv.iloc[ind[i]-1], senv.iloc[ind[i]]
             tout.append((threshold-y1)*(x2-x1)/(y2-y1) + x1)
         return tout[0], tout[1]
+
+    def attenuation(self, a, c=None, f=None, gates=None, pw=None):
+        """
+        This methods computes the ultrasound attenuation of the signal. This is based on a piston
+        transducer model.
+
+        Parameters
+        ----------
+        a : float
+            This is the diameter of the ultrasound transducer.
+        c : float, optional
+            The wave speed. If not provided, it will be estimated from the given signal.
+        f : float, optional
+            The frequency of the wave. If not provided, it is estimated from the signal.
+        Returns
+        -------
+
+        References
+        ----------
+        Shmerr and Song 2007
+
+        """
+        # first segment the signal
+        if f is None:
+            pass
+            # we need to find an initial approximation of the frequency
+        if gates is None or pw is None:
+            parts = self.segment()
 
     def tof(self, method='corr', ref=None):
         """
