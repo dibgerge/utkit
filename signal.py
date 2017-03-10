@@ -268,7 +268,7 @@ class Signal(pd.Series):
         else:
             return out.fillna(fill)
 
-    def segment(self, thres, pulse_width, win_fcn='hann'):
+    def segment(self, thres, pulse_width, win_fcn='hann', holdoff=None):
         """
         Segments the signal into a collection of signals, with each item in the collection,
         representing the signal within a given time window. This is usually useful to
@@ -291,6 +291,9 @@ class Signal(pd.Series):
             :func:`scipy.signal.get_window()` for a complete list of available windows,
             and how to pass extra parameters for a specific window type, if needed.
 
+        holdoff : float, optional
+            The minimum index for which to extract a segment from the signal.
+
         Returns
         -------
             : list
@@ -299,11 +302,20 @@ class Signal(pd.Series):
         """
         sig = self.operate('e')
         peak_ind = peakutils.indexes(sig.values, thres=thres, min_dist=int(pulse_width * self.fs))
-        wind_len = np.mean(np.diff(self.index[peak_ind]))
-        parts = [self.window(index1=self.index[i]-wind_len/2.0,
-                             index2=self.index[i]+wind_len/2.0,
-                             win_fcn=win_fcn) for i in peak_ind]
-        return parts
+        if holdoff is not None:
+            peak_ind = peak_ind[self.index[peak_ind] > holdoff]
+
+        # remove segment if its end is over the limit of signal end
+        if self.index[peak_ind[-1]] + pulse_width > self.index[-1]:
+            peak_ind = np.delete(peak_ind, -1)
+
+        # wind_len = np.mean(np.diff(self.index[peak_ind]))
+        parts, lims = [], []
+        for ind in peak_ind:
+            win_st, win_end = self.index[ind]-pulse_width, self.index[ind]+pulse_width
+            lims.append([win_st, win_end])
+            parts.append(self.window(index1=win_st, index2=win_end, win_fcn=win_fcn))
+        return parts, lims
 
     def operate(self, option=''):
         """
@@ -454,17 +466,24 @@ class Signal(pd.Series):
             The computed time of flight, with the same units as the Signal index.
         """
         if method.lower() == 'corr':
+            if ref is None:
+                raise ValueError('A reference signal should be specified to compute the tof using '
+                                 'the correlation method.')
             # try:
             #     other = ref[0]
             # except IndexError:
-            #     raise ValueError('Another signal should be specified to compute the tof using the '
-            #                      'correlation method.')
+            #     raise ValueError('Another signal should be specified to compute the tof using the'
+            #                      ' correlation method.')
             c = fftconvolve(self.operate('n'), ref.operate('n')[::-1], mode='full')
             ind = self.size - np.argmax(c)
             return self.ts * ind
         elif method.lower() == 'max':
-            return self.normalize('max').idxmax()
+            return self.normalize('max').abs().idxmax()
         elif method.lower() == 'thresh':
+            thresh = 20*np.log10(self.std()/self.abs().max())
+            ind = self.limits(thresh)[0]
+            pks = peakutils.indexes(self.operate('e'), self.std()/self.abs().max(),
+                                    2/self.bandwidth())
             try:
                 thresh = ref[0]
             except IndexError:
