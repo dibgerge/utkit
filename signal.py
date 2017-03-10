@@ -438,34 +438,28 @@ class Signal(pd.Series):
             The computed time of flight, with the same units as the Signal index.
         """
         if method.lower() == 'corr':
-<<<<<<< HEAD
             if ref is None:
                 raise ValueError('A reference signal should be specified to compute the tof using '
                                  'the correlation method.')
-=======
             # try:
             #     other = ref[0]
             # except IndexError:
-            #     raise ValueError('Another signal should be specified to compute the tof using the '
-            #                      'correlation method.')
->>>>>>> 30a788ed29a5c5892c87925a7e3a511619ff936d
+            #     raise ValueError('Another signal should be specified to compute the tof using the'
+            #                      ' correlation method.')
             c = fftconvolve(self.operate('n'), ref.operate('n')[::-1], mode='full')
             ind = self.size - np.argmax(c)
             return self.ts * ind
         elif method.lower() == 'max':
             return self.normalize('max').abs().idxmax()
         elif method.lower() == 'thresh':
-<<<<<<< HEAD
             thresh = 20*np.log10(self.std()/self.abs().max())
             ind = self.limits(thresh)[0]
             pks = peakutils.indexes(self.operate('e'), self.std()/self.abs().max(),
                                     2/self.bandwidth())
-=======
             try:
                 thresh = ref[0]
             except IndexError:
                 thresh = -12
->>>>>>> 30a788ed29a5c5892c87925a7e3a511619ff936d
             return self.limits(thresh)[0]
         else:
             raise ValueError('method not supported. See documentation for supported methods.')
