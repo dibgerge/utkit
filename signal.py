@@ -398,7 +398,7 @@ class Signal(pd.Series):
             tout.append((threshold-y1)*(x2-x1)/(y2-y1) + x1)
         return tout[0], tout[1]
 
-    def tof(self, method='corr', *args):
+    def tof(self, method='corr', ref=None):
         """
         Computes the time of flight relative to another signal. Three different methods for
         computing the time of flight are currently supported.
@@ -426,19 +426,19 @@ class Signal(pd.Series):
             The computed time of flight, with the same units as the Signal index.
         """
         if method.lower() == 'corr':
-            try:
-                other = args[0]
-            except IndexError:
-                raise ValueError('Another signal should be specified to compute the tof using the '
-                                 'correlation method.')
-            c = fftconvolve(self.operate('n'), other.operate('n')[::-1], mode='full')
+            # try:
+            #     other = ref[0]
+            # except IndexError:
+            #     raise ValueError('Another signal should be specified to compute the tof using the '
+            #                      'correlation method.')
+            c = fftconvolve(self.operate('n'), ref.operate('n')[::-1], mode='full')
             ind = self.size - np.argmax(c)
             return self.ts * ind
         elif method.lower() == 'max':
             return self.normalize('max').idxmax()
         elif method.lower() == 'thresh':
             try:
-                thresh = args[0]
+                thresh = ref[0]
             except IndexError:
                 thresh = -12
             return self.limits(thresh)[0]
