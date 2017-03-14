@@ -7,6 +7,8 @@ from scipy.integrate import simps
 from . import peakutils
 from .signal2d import Signal2D
 from matplotlib import pyplot
+from scipy.special import jv
+from scipy.optimize import curve_fit
 
 
 class Signal(pd.Series):
@@ -51,19 +53,15 @@ class Signal(pd.Series):
         if not self.index.is_monotonic_increasing:
             raise ValueError('Index must be monotonically increasing.')
 
-        self._interp_fnc = None
-        self._interp_kwargs = {'w': None,
-                               'bbox': [None, None],
-                               'k': 3,
-                               'ext': 1,
-                               'check_finite':  False}
-
     @property
     def _constructor(self):
         """ Override the abstract class method so that all base class methods (i.e.
         methods in pd.Series) return objects of type utkit.Series when required.
         """
         return Signal
+
+    def __hash__(self):
+        return hash(str(self.values))
 
     def __call__(self, key=None, ts=None, **kwargs):
         """
@@ -85,12 +83,12 @@ class Signal(pd.Series):
         Returns
         -------
         value : float
-           If *key* is a float, then the value of :class:`Signal` at given
-           *key* is returned.
+           If `key` is a float, then the value of :class:`Signal` at given
+           `key` is returned.
 
         value : Signal
-           If *key* is a sequence, a new :class:`Signal` with its time base
-           given by *key* is returned.
+           If `key` is a sequence, a new :class:`Signal` with its time base
+           given by `key` is returned.
 
         Note
         ----
@@ -106,23 +104,20 @@ class Signal(pd.Series):
         """
         if key is None and ts is None:
             return self.copy()
-
         if key is not None and ts is not None:
             raise AttributeError("Only one of key or ts can be specified at one time, not both.")
-
         if ts is not None:
             key = np.arange(self.index[0], self.index[-1], ts)
 
-        same_args = True
-        for k in kwargs:
-            if self._interp_kwargs[k] != kwargs[k]:
-                same_args = False
-                self._interp_kwargs[k] = kwargs[k]
+        # set extrapolation to return 0 by default
+        if 'ext' not in kwargs:
+            kwargs['ext'] = 1
 
-        if self._interp_fnc is None or not same_args:
-            self._interp_fnc = InterpolatedUnivariateSpline(self.index, self.values,
-                                                            **self._interp_kwargs)
-        return Signal(self._interp_fnc(key), index=key if hasattr(key, '__len__') else [key])
+        self._interp_fnc = InterpolatedUnivariateSpline(self.index, self.values, **kwargs)
+        if hasattr(key, '__len__'):
+            return Signal(self._interp_fnc(key), index=key)
+        else:
+            return float(self._interp_fnc(key))
 
     def window(self, index1=None, index2=None, is_positional=False, win_fcn='boxcar',
                fftbins=False):
@@ -178,7 +173,65 @@ class Signal(pd.Series):
             wind[-index2:-index1] = get_window(win_fcn, len(wind[-index2:-index1]))
         return self*wind
 
-    def normalize(self, option='max'):
+    def peaks(self, threshold=None, min_dist=None, by_envelop=False):
+        """
+        Finds the peaks by taking its first order difference. By using *thres* and
+        *min_dist* parameters, it is possible to reduce the number of detected peaks.
+
+        Parameters
+        ----------
+        threshold : float, [0., 1.]
+            Normalized threshold. Only the peaks with amplitude higher than the
+            threshold will be detected.
+
+        min_dist : float
+            The minimum distance in index units between ech detected peak. The peak with the highest
+            amplitude is preferred to satisfy this constraint.
+
+        by_envelop : bool
+            Compute the peaks of the signal based on its envelop.
+
+        Returns
+        -------
+        : ndarray
+            Array containing the indexes of the peaks that were detected
+
+        Notes
+        -----
+        This method is adapted from the peak detection method in
+        [PeakUtils](http://pythonhosted.org/PeakUtils/)
+        """
+        y = self.operate('ne') if by_envelop else self.operate('n').abs()
+        if threshold is None:
+            threshold = np.sqrt(y.energy()/len(self))
+        if threshold > 1 or threshold <= 0:
+            raise ValueError('Threshold should be in the range (0.0, 1.0].')
+        if min_dist is None:
+            min_dist = self.ts
+        if min_dist <= 0.0:
+            raise ValueError('min_dist should be a positive value.')
+        # threshold = threshold * (y.max() - y.min()) + y.min()
+        # find the peaks by using the first order difference
+        dy = np.diff(y)
+        peaks = np.where((np.hstack([dy, 0.]) < 0.)
+                         & (np.hstack([0., dy]) > 0.)
+                         & (y > threshold))[0]
+
+        min_dist = int(min_dist/y.ts)
+        if peaks.size > 1 and min_dist > 1:
+            highest = peaks[np.argsort(y.iloc[peaks])][::-1]
+            rem = np.ones(y.size, dtype=bool)
+            rem[peaks] = False
+
+            for peak in highest:
+                if not rem[peak]:
+                    sl = slice(max(0, peak - min_dist), peak + min_dist + 1)
+                    rem[sl] = True
+                    rem[peak] = False
+            peaks = np.arange(y.size)[~rem]
+        return self.iloc[peaks]
+
+    def normalize(self, option='max', inplace=False):
         """
         Normalizes the signal according to a given option.
 
@@ -187,22 +240,33 @@ class Signal(pd.Series):
         option: string, optional
             Method to be used to normalize the signal. The possible options are:
 
-                * *'max' (Default)* : Divide by the maximum of the signal, so that the normalized
-                  maximum has an amplitude of 1.
+            * *'max' (Default)* : Divide by the maximum of the signal, so that the normalized
+                                  maximum has an amplitude of 1. :math:`\max \mathbf{s}`
 
-                * *'energy'*: Divide by the signal energy.
+            * *'energy'*: Divide by the signal energy: :math:`\sum_{i=1}^N s_i^2`
 
+            * *'rms'* : The normalization is given by: :math:`\sqrt{\\frac{\sum_{i=1}^N s_i^2}{N}}`
+
+        inplace : bool
+            Change the Signal in place.
         Returns
         -------
-            : Signal
-                Signal with normalized amplitude.
+        : Signal
+            Signal with normalized amplitude.
         """
         if option == 'energy':
-            return self/np.sqrt(self.energy())
+            fact = np.sqrt(self.energy())
         elif option == 'max':
-            return self/np.max(np.abs(self.values))
+            fact = np.max(np.abs(self.values))
+        elif option == 'rms':
+            fact = np.sqrt(self.energy()/len(self))
         else:
             raise ValueError('Unknown option value.')
+        if inplace:
+            self[:] = self/fact
+            return self
+        else:
+            return self/fact
 
     def pad(self, extent, fill=0.0, position='split'):
         """
@@ -268,7 +332,7 @@ class Signal(pd.Series):
         else:
             return out.fillna(fill)
 
-    def segment(self, thres, pulse_width, win_fcn='hann', holdoff=None):
+    def segment(self, threshold, pulse_width, min_dist=None, holdoff=None, win_fcn='boxcar'):
         """
         Segments the signal into a collection of signals, with each item in the collection,
         representing the signal within a given time window. This is usually useful to
@@ -276,7 +340,7 @@ class Signal(pd.Series):
 
         Parameters
         ----------
-        thres : float
+        threshold : float
             A threshold value (in dB). Search for echoes will be only for signal values
             above this given threshold. Note that the maximum threshold is 0 dB, since
             the signal will be normalized by its maximum before searching for echoes.
@@ -286,13 +350,13 @@ class Signal(pd.Series):
             index. If this is not known exactly, it is generally better to specify this
             parameter to be slightly larger than the actual pulse_width.
 
+        holdoff : float, optional
+            The minimum index for which to extract a segment from the signal.
+
         win_fcn : string, array_like
             The window type that will be used to window each extracted segment (or echo). See
             :func:`scipy.signal.get_window()` for a complete list of available windows,
             and how to pass extra parameters for a specific window type, if needed.
-
-        holdoff : float, optional
-            The minimum index for which to extract a segment from the signal.
 
         Returns
         -------
@@ -300,24 +364,24 @@ class Signal(pd.Series):
             A list with elements of type :class:`Signal`. Each Signal element represents an
             extracted segment.
         """
-        sig = self.operate('e')
-        peak_ind = peakutils.indexes(sig.values, thres=thres, min_dist=int(pulse_width * self.fs))
+        if min_dist is None:
+            min_dist = pulse_width
+        pks = self.peaks(threshold, min_dist)
         if holdoff is not None:
-            peak_ind = peak_ind[self.index[peak_ind] > holdoff]
-
+            pks = pks[holdoff:]
         # remove segment if its end is over the limit of signal end
-        if self.index[peak_ind[-1]] + pulse_width > self.index[-1]:
-            peak_ind = np.delete(peak_ind, -1)
+        if pks.index[-1] + pulse_width > self.index[-1]:
+            pks = pks.iloc[:-1]
 
-        # wind_len = np.mean(np.diff(self.index[peak_ind]))
-        parts, lims = [], []
-        for ind in peak_ind:
-            win_st, win_end = self.index[ind]-pulse_width, self.index[ind]+pulse_width
-            lims.append([win_st, win_end])
-            parts.append(self.window(index1=win_st, index2=win_end, win_fcn=win_fcn))
-        return parts, lims
+        out = Signal2D(0, index=self.index, columns=np.arange(len(pks)))
+        lims = pd.DataFrame(0, index=['start', 'end'], columns=np.arange(len(pks)))
+        for i, ind in enumerate(pks.index):
+            win_st, win_end = ind-pulse_width, ind+pulse_width
+            lims[i] = [win_st, win_end]
+            out[i] = self.window(index1=win_st, index2=win_end, win_fcn=win_fcn)
+        return out, lims
 
-    def operate(self, option=''):
+    def operate(self, option='', norm_method='max', inplace=False):
         """
         This is a convenience function for common operations on signals. Returns the signal
         according to a given option.
@@ -343,14 +407,22 @@ class Signal(pd.Series):
         : Signal
             The new signal with the specified operation.
         """
+        n = len(self)
         yout = self
         if 'e' in option:
-            yout = np.abs(hilbert(yout))
+            # make hilbert transform faster by computing it at powers of 2
+            pwr2 = np.log2(n)
+            n2 = 2 ** int(pwr2) if pwr2.is_integer() else 2 ** (int(pwr2) + 1)
+            yout = Signal(abs(hilbert(yout.values, N=n2))[:n], index=self.index)
         if 'n' in option:
-            yout = yout/max(np.abs(yout))
+            yout = yout.normalize(norm_method)
         if 'd' in option:
-            yout = 20*np.log10(np.abs(yout))
-        return Signal(yout, index=self.index)
+            yout = 20*np.log10(abs(yout))
+        if inplace:
+            self[:] = yout
+            return self
+        else:
+            return yout
 
     def fft(self, nfft=None, ssb=False):
         """
@@ -372,7 +444,7 @@ class Signal(pd.Series):
 
         Returns
         -------
-         : Signal
+        : Signal
             The FFT of the signal.
         """
         if nfft is None:
@@ -380,7 +452,7 @@ class Signal(pd.Series):
         uf = Signal(fftshift(fft(self.values, n=nfft)), index=fftshift(fftfreq(nfft, self.ts)))
         return uf[uf.index >= 0] if ssb else uf
 
-    def limits(self, threshold=-20):
+    def limits(self, thresh=None):
         """
         Computes the index limits where the signal first goes above a given threshold,
         and where it last goes below this threshold. Linear interpolation is used to find the
@@ -388,29 +460,31 @@ class Signal(pd.Series):
 
         Parameters
         ----------
-        threshold : float, optional
-            Units is dB. The value used to compute the where the signal first rises above and
-            last falls below.
+        thresh : float, optional, (0.0, 1.0]
+            Normalized value where the signal first rises above and last falls below. If no value is
+            specified, the default is the root mean square of the signal.
 
         Returns
         -------
         start_index, end_index (tuple (2,)):
             A two element tuple representing the *start_index* and *end_index* of the signal.
         """
-        if threshold > 0:
-            raise ValueError("threshold should be dB value <= 0, which is relative to the "
-                             "normalized maximum amplitude.")
-        senv = self.operate('nd')
-        ind = np.where(senv >= threshold)[0]
+        senv = self.operate('n')
+        if thresh is None:
+            thresh = self.std()
+        if thresh <= 0 or thresh > 1:
+            raise ValueError("`threshold` should be in the normalized (0.0, 1.0].")
+        ind = np.where(senv.values >= thresh)[0]
+
         tout = []
         # make linear interpolation to get time value at threshold
         for i in [0, -1]:
             x1, x2 = self.index[ind[i]-1], self.index[ind[i]]
             y1, y2 = senv.iloc[ind[i]-1], senv.iloc[ind[i]]
-            tout.append((threshold-y1)*(x2-x1)/(y2-y1) + x1)
+            tout.append((thresh - y1) * (x2 - x1) / (y2 - y1) + x1)
         return tout[0], tout[1]
 
-    def attenuation(self, a, c=None, f=None, gates=None, pw=None):
+    def attenuation(self, a, d, pw, f=None, thres=None):
         """
         This methods computes the ultrasound attenuation of the signal. This is based on a piston
         transducer model.
@@ -419,10 +493,13 @@ class Signal(pd.Series):
         ----------
         a : float
             This is the diameter of the ultrasound transducer.
-        c : float, optional
-            The wave speed. If not provided, it will be estimated from the given signal.
+
+        d : float, optional
+            Material thickness (propagation distance is assumed to be double the thickness)
+
         f : float, optional
             The frequency of the wave. If not provided, it is estimated from the signal.
+
         Returns
         -------
 
@@ -431,12 +508,45 @@ class Signal(pd.Series):
         Shmerr and Song 2007
 
         """
-        # first segment the signal
+        echoes, _ = self.segment(threshold=thres, pulse_width=pw)
+        if echoes.shape[1] < 2:
+            ValueError('We need at least two echoes to compute the attenuation.')
+
+        # compute the propagation distance for each echo
+        x = 2*d*np.arange(1, echoes.shape[1]+1)
+
+        # estimate the mean velocity
+        c = np.mean(2*d/np.array([echoes[i].tof('corr', echoes[i-1]) for i in echoes.loc[:, 1:]]))
+
+        # compute the FFT, which will be used for amplitudes computation
+        Y = echoes.fft(ssb=True, axes=0).abs()
+
+        # find the freuqnecies of the signal within the -6 dB bandwidth
         if f is None:
-            pass
-            # we need to find an initial approximation of the frequency
-        if gates is None or pw is None:
-            parts = self.segment()
+            # find the -6 dB limits of the frequency spectrum
+            fmin, fmax = Y.iloc[:, 0].limits(0.5)
+            amps = Y[fmin:fmax]
+        elif f == 'max':
+            fmin, fmax = Y.iloc[:, 0].limits(0.5)
+            f = [(fmin+fmax)/2]
+            amps = Y.apply(lambda v: Signal.__call__(v, f), axis=0)
+        else:
+            if not hasattr(f, '__len__'):
+                f = [f]
+            amps = Y.apply(lambda v: Signal.__call__(v, f), axis=0)
+
+        def compute_att(xloc, alpha, A, flocal):
+            p = 2*np.pi*flocal*a**2/(c * xloc)
+            D = 1 - np.exp(1j*p)*(jv(0, p) - 1j*jv(1, p))
+            return A * abs(D) * np.exp(-alpha * xloc)
+            # return A*np.exp(-alpha * xloc)
+
+        params = pd.DataFrame(0, index=amps.index, columns=['alpha', 'A'])
+        for fi in amps.index:
+            popt, pcov = curve_fit(lambda xp, alphap, ap: compute_att(xp, alphap, ap, fi), x,
+                                   amps.loc[fi, :].values, p0=[0.02, 10])
+            params.loc[fi] = popt
+        return params
 
     def tof(self, method='corr', ref=None):
         """
@@ -455,10 +565,11 @@ class Signal(pd.Series):
                 * *max* : The maximum value of the signal is used to compute the time of flight.
                   This time of flight is relative to the signal's time 0.
 
-                * *thresh* : Compute the time the signal first crosses a given threshold value. The
-                  threshold should  be given as argument in dB units. Note that the signal is
-                  normalized by it's maximum for the purpose of finding the threshold crossing,
-                  thus the maximum dB value is 0. If no threshold is given, the default is -12 dB.
+                * *thresh* :  Compute the time the signal first crosses a given threshold value.
+                The value of `ref` will be the required threshold, which should be normalized
+                values between (0.0, 1.0], relative to the maximum value of the signal. If no
+                reference value is given, the threshold is computed the root mean square of the
+                signal.
 
         Returns
         -------
@@ -469,26 +580,13 @@ class Signal(pd.Series):
             if ref is None:
                 raise ValueError('A reference signal should be specified to compute the tof using '
                                  'the correlation method.')
-            # try:
-            #     other = ref[0]
-            # except IndexError:
-            #     raise ValueError('Another signal should be specified to compute the tof using the'
-            #                      ' correlation method.')
-            c = fftconvolve(self.operate('n'), ref.operate('n')[::-1], mode='full')
+            c = fftconvolve(ref.values, self.values[::-1], mode='full')
             ind = self.size - np.argmax(c)
             return self.ts * ind
         elif method.lower() == 'max':
-            return self.normalize('max').abs().idxmax()
+            return self.abs().idxmax()
         elif method.lower() == 'thresh':
-            thresh = 20*np.log10(self.std()/self.abs().max())
-            ind = self.limits(thresh)[0]
-            pks = peakutils.indexes(self.operate('e'), self.std()/self.abs().max(),
-                                    2/self.bandwidth())
-            try:
-                thresh = ref[0]
-            except IndexError:
-                thresh = -12
-            return self.limits(thresh)[0]
+            return self.limits(ref)[0]
         else:
             raise ValueError('method not supported. See documentation for supported methods.')
 
@@ -661,16 +759,18 @@ class Signal(pd.Series):
         fdomain = fdomain.window(index1=index1, index2=index2, win_fcn=win_fcn, fftbins=True)
         return Signal(np.real(ifft(fftshift(fdomain))), index=self.index)
 
-    def center_frequency(self, threshold=-6, nfft=None):
+    def frequency(self, option='center', threshold=None, nfft=None):
         """
-        Computes the center frequency of the signal, which is the mean of the bandwidth limits.
+        Computes the center or peak frequency of the signal.
 
         Parameters
         ----------
-        threshold : float, optional
-            Threshold value in dB, indicating the noise floor level. This value should be
-            negative, as the specturm is normalized by its maximum values, and thus the maximum
-            amplitude is 0 dB. Default is -6 dB.
+        option : str, {'center', 'peak'}
+            Specify whether to compute the center or peak frequency of the signal.
+
+        threshold : float, optional, (0.0, 1.0]
+            Threshold value indicating the noise floor level. Default value is the root mean
+            square.
 
         nfft : bool, optional
             Since this computation is based on the Fourier transform, indicate the number of
@@ -679,49 +779,30 @@ class Signal(pd.Series):
         Returns
         -------
         : float
-            The value of the center frequency in Hz.
+            The value of the center frequency.
         """
-        if threshold > 0:
-            raise ValueError("threshold should be dB value <= 0.")
-        fdomain = self.fft(ssb=True, nfft=nfft)
-        yn = fdomain.operate('nd')
-        frequencies = yn[yn >= threshold].index
-        return (frequencies.max() + frequencies.min())/2
+        if (threshold is not None) and (threshold <= 0 or threshold > 1):
+            raise ValueError("Threshold should be in the range (0.0, 1.0].")
+        fdomain = self.fft(ssb=True, nfft=nfft).abs()
 
-    def peak_frequency(self, threshold=-6, nfft=None):
-        """
-        Computes the peak frequency of the signal.
+        if option == 'center':
+            yn = fdomain.operate('n')
+            minf, maxf = yn.limits()
+            return (minf+maxf)/2.0
+        if option == 'peak':
+            return fdomain.idxmax()
+        raise ValueError('`option` value given is unknown. Supported options: {"center", "peak"}.')
 
-        Parameters
-        ----------
-        threshold : float, optional
-            Threshold value in dB, indicating the noise floor level. This value should be
-            negative, as the spectrum is normalized by its maximum values, and thus the maximum
-            amplitude is 0 dB. Default is -6 dB.
-
-        nfft : bool, optional
-            Since this computation is based on the Fourier transform, indicate the number of
-            points to be used on computing the FFT.
-
-        Returns
-        -------
-        : float
-            The value of the center frequency in Hz.
-        """
-        if threshold > 0:
-            raise ValueError("threshold should be dB value <= 0.")
-        return self.fft(ssb=True, nfft=nfft).idxmax()
-
-    def bandwidth(self, threshold=-6, nfft=None):
+    def bandwidth(self, threshold=None, nfft=None):
         """
         Computes the bandwidth of the signal by finding the range of frequencies
         where the signal is above a given threshold.
 
         Parameters
         ----------
-        threshold : float, optional
-            Units is decibel (dB) <= 0. The spectrum is normalized by its maximum value,
-            and thus the maximum amplitude is 0 dB. Default is -6 dB.
+        threshold : float, optional, (0.0, 1.0]
+            The normalized threshold for which to compute the bandwidth. If this is not
+            specified, the threshold is set to the root mean square value of the signal.
 
         nfft : bool, optional
             Since this computation is based on the Fourier transform, indicate the number of
@@ -732,11 +813,10 @@ class Signal(pd.Series):
         : float
             The total signal bandwidth.
         """
-        if threshold > 0:
-            raise ValueError("threshold should be dB value <= 0.")
-
-        fdomain = self.fft(ssb=True, nfft=nfft)
-        lims = fdomain.abs().limits(threshold)
+        if threshold <= 0 or threshold > 1:
+            raise ValueError("Threshold should be in the range (0.0, 1.0].")
+        fdomain = self.fft(ssb=True, nfft=nfft).abs()
+        lims = fdomain.limits(threshold)
         return lims[1] - lims[0]
 
     def maxof(self, option='peak'):
@@ -776,34 +856,16 @@ class Signal(pd.Series):
                              "'env', 'peak', or 'fft'.")
         return np.max(y.values)
 
-    def energy(self, option='abs'):
+    def energy(self):
         """
-        Computes the energy of the given waveform in the specified domain. Simpson's integration
-        is used for computing the total energy.
-
-        Parameters
-        ----------
-        option : str, optional
-            The method to be used to compute the energy. Supported options are:
-
-            =================    ======================================
-            *option*               Meaning
-            =================    ======================================
-            abs                  Use the absolute value of the signal
-            env                  Use the envelop of the signal
-            =================    ======================================
+        Computes the energy of the given waveform in the specified domain.
 
         Returns
         -------
         : float
             The computes energy in the signal.
         """
-        if option == 'abs':
-            return simps(self.values**2, x=self.index)
-        elif option == 'env':
-            return simps(self.operate('e'), x=self.index)
-        else:
-            raise ValueError("The value for option is unknown. Should be either 'abs' or 'env'.")
+        return np.power(self, 2).sum()
 
     def remove_mean(self):
         """
@@ -818,7 +880,13 @@ class Signal(pd.Series):
 
     @property
     def ts(self):
-        """ Get the signal sampling period. """
+        """
+        Get the signal sampling period.
+
+        Returns
+        -------
+        : float
+        """
         return np.mean(np.diff(self.index))
 
     @property

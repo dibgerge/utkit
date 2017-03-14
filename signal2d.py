@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
-from scipy.signal import hilbert, get_window
+from scipy.signal import hilbert, get_window, fftconvolve
 from scipy.interpolate import griddata
 from scipy.fftpack import fft2, fftfreq, fftshift, ifft2
 from .signal3d import Signal3D
 from matplotlib import pyplot
+from scipy.special import jv
+from scipy.optimize import curve_fit
 
 
 class Signal2D(pd.DataFrame):
@@ -61,8 +63,8 @@ class Signal2D(pd.DataFrame):
         # check for axes monotonicity
         if not self.index.is_monotonic_increasing:
             raise ValueError('Index must be monotonically increasing.')
-        if not self.columns.is_monotonic_increasing:
-            raise ValueError('Columns must be monotonically increasing.')
+        # if not self.columns.is_monotonic_increasing:
+        #     raise ValueError('Columns must be monotonically increasing.')
 
     @property
     def _constructor(self):
@@ -165,7 +167,7 @@ class Signal2D(pd.DataFrame):
         indices = [np.arange(self.axes[i][0], self.axes[i][-1], ts[i]) for i in range(2)]
         return self(index=indices[0], columns=indices[1], **kwargs)
 
-    def operate(self, option='', axis=0):
+    def operate(self, option='', norm='max', axis=0):
         """
         Returns the signal according to a given option.
 
@@ -199,9 +201,10 @@ class Signal2D(pd.DataFrame):
             n = self.shape[axis]
             pwr2 = np.log2(n)
             n = 2**int(pwr2) if pwr2.is_integer() else 2**(int(pwr2) + 1)
-            yout = np.abs(hilbert(yout.values, N=n, axis=axis,))
+            yout = np.abs(hilbert(yout.values, N=n, axis=axis))
             yout = yout[:self.shape[0], :self.shape[1]]
         if 'n' in option:
+            # TODO: call normalize funciton
             yout = yout/np.abs(yout).max().max()
         if 'd' in option:
             yout = 20*np.log10(np.abs(yout))
@@ -274,6 +277,8 @@ class Signal2D(pd.DataFrame):
             shape = shape.astype(int)
 
         fval = fftshift(fft2(self.values, axes=axes, shape=shape, **kwargs), axes=axes)
+        # pyplot.plot(abs(fval))
+        # pyplot.show()
 
         coords = [self.index, self.columns]
         for ax in axes:
@@ -787,8 +792,122 @@ class Signal2D(pd.DataFrame):
                 raise ValueError('Unknown axis value.')
         else:
             raise ValueError('Unknown option value.')
-
         return coord, out
+
+    def tof(self, method='corr'):
+        """
+        Computes the time of flight relative to another signal. Three different methods for
+        computing the time of flight are currently supported.
+
+        Parameters
+        ----------
+        method: string, optional
+            The method to be used for computing the signal time of flight. The following methods
+            are currently supported:
+
+                * *corr* : Use a correlation peak to compute the time of flight relative to another
+                  signal. Another signal should be provided as input for performing the correlation.
+
+                * *max* : The maximum value of the signal is used to compute the time of flight.
+                  This time of flight is relative to the signal's time 0.
+
+                * *thresh* :  Compute the time the signal first crosses a given threshold value.
+                The value of `ref` will be the required threshold, which should be normalized
+                values between (0.0, 1.0], relative to the maximum value of the signal. If no
+                reference value is given, the threshold is computed the root mean square of the
+                signal.
+
+        Returns
+        -------
+        : float
+            The computed time of flight, with the same units as the Signal index.
+        """
+        tof = []
+        n = self.shape[1]
+        if n < 2:
+            ValueError('We need at least two echoes to compute the time of flight.')
+        if method.lower() == 'corr':
+            for i in np.arange(1, n):
+                c = fftconvolve(self.iloc[:, i-1].values, self.iloc[:, i].values[::-1], mode='full')
+                tof.append(self[i].ts * (self[i].size - np.argmax(c)))
+            return np.array(tof)
+        elif method.lower() == 'max':
+            for i in self:
+                tof.append(self[i].abs().idxmax())
+            return np.diff(tof)
+        elif method.lower() == 'thresh':
+            for i in self:
+                tof.append(self.limits(self[i])[0])
+            return np.diff(tof)
+        else:
+            raise ValueError('method not supported. See documentation for supported methods.')
+
+    def attenuation(self, a, d, c=None, f=None):
+        """
+        Compute the ultrasound attenuation. This is based on a piston transducer model. We assume
+        that each column represents a different echo in the signal, and we compute attenuation
+        across the columns.
+
+        Parameters
+        ----------
+        a : float
+            This is the diameter of the ultrasound transducer.
+
+        d : float, optional
+            Material thickness (propagation distance is assumed to be double the thickness)
+
+        f : float, optional
+            The frequency of the wave. If not provided, it is estimated from the signal.
+
+        Returns
+        -------
+
+        References
+        ----------
+        Shmerr and Song 2007
+
+        """
+        if self.shape[1] < 2:
+            ValueError('We need at least two echoes to compute the attenuation.')
+
+        # compute the propagation distance for each echo
+        x = 2*d*np.arange(1, self.shape[1]+1)
+
+        # estimate the mean velocity
+        if c is None:
+            c = np.mean(2*d/self.tof())
+
+        # compute the FFT, which will be used for amplitudes computation
+        Y = self.fft(ssb=True, axes=0).abs()
+
+        # find the freuqnecies of the signal within the -6 dB bandwidth
+        if f is None:
+            # find the -6 dB limits of the frequency spectrum
+            fmin, fmax = Y.iloc[:, 0].limits(0.5)
+            amps = Y[fmin:fmax]
+        elif f == 'max':
+            fmin, fmax = Y.iloc[:, 0].limits(0.5)
+            f = (fmin+fmax)/2
+            amps = Y[f:f+self.ts[0]]
+        else:
+            if not hasattr(f, '__len__'):
+                amps = Y[f:f+self.ts[0]]
+                f = [f]
+            else:
+                amps = Y.loc[f, :]
+
+        def compute_att(xloc, alpha, A, flocal):
+            p = 2*np.pi*flocal*a**2/(c * xloc)
+            D = 1 - np.exp(1j*p)*(jv(0, p) - 1j*jv(1, p))
+            return A * abs(D) * np.exp(-alpha * xloc)
+        # print(amps)
+        params = pd.DataFrame(0, index=amps.index, columns=['alpha', 'A'])
+        for fi in amps.index:
+            popt, pcov = curve_fit(lambda xp, alphap, ap: compute_att(xp, alphap, ap, fi), x,
+                                   amps.loc[fi, :].values, p0=[0.02, 10])
+            params.loc[fi] = popt
+        return params
+
 
     @property
     def ts(self):
