@@ -367,6 +367,8 @@ class Signal(pd.Series):
         if min_dist is None:
             min_dist = pulse_width
         pks = self.peaks(threshold, min_dist)
+        if len(pks) == 0:
+            return Signal2D(), Signal2D()
         if holdoff is not None:
             pks = pks[holdoff:]
         # remove segment if its end is over the limit of signal end

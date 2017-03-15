@@ -262,6 +262,9 @@ class Signal2D(pd.DataFrame):
         axes : int, array_like, optional
             The axes along which to compute the FFT.
 
+        shape : int, array_like, optional
+            The size of the fft
+
         Returns
         -------
         : Signal2D
@@ -273,14 +276,15 @@ class Signal2D(pd.DataFrame):
         :func:`scipy.fftpack.fft2`.
         """
         axes = self._get_axes_numbers(axes)
-        shape = self._cook_args(shape, axes)
+        if shape == 'next':
+            shape = 2 ** np.ceil(np.log2(self.shape))
+            shape = shape[axes[0]] if len(axes) == 1 else shape
 
+        shape = self._cook_args(shape, axes)
         if shape is not None:
             shape = shape.astype(int)
 
         fval = fftshift(fft2(self.values, axes=axes, shape=shape, **kwargs), axes=axes)
-        # pyplot.plot(abs(fval))
-        # pyplot.show()
 
         coords = [self.index, self.columns]
         for ax in axes:
@@ -433,7 +437,6 @@ class Signal2D(pd.DataFrame):
                 break
             n = len(s_seg)
             yf = s_seg.fft(ssb=True, axes=0, **kwargs).abs()
-            print(n, self.shape)
             start += width - overlap
             amp += 2 * yf(fc).values**2 / n
         return amp
@@ -902,7 +905,6 @@ class Signal2D(pd.DataFrame):
             p = 2*np.pi*flocal*a**2/(c * xloc)
             D = 1 - np.exp(1j*p)*(jv(0, p) - 1j*jv(1, p))
             return A * abs(D) * np.exp(-alpha * xloc)
-        # print(amps)
         params = pd.DataFrame(0, index=amps.index, columns=['alpha', 'A'])
         for fi in amps.index:
             popt, pcov = curve_fit(lambda xp, alphap, ap: compute_att(xp, alphap, ap, fi), x,
@@ -910,11 +912,12 @@ class Signal2D(pd.DataFrame):
             params.loc[fi] = popt
         return params
 
-
     @property
     def ts(self):
         """ Get the signal sampling period. """
-        return np.mean(np.diff(self.index)), np.mean(np.diff(self.columns))
+        idx = np.mean(np.diff(self.index)) if len(self.index) > 1 else 0
+        col = np.mean(np.diff(self.columns)) if len(self.columns) > 1 else 0
+        return idx, col
 
     @property
     def x(self):
