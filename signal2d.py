@@ -126,10 +126,13 @@ class Signal2D(pd.DataFrame):
         Other keyword arguments are passed directly to the interpolation function
         :func:`scipy.interpolate.griddata`.
         """
-        if index is None:
-            index = self.index.values
-        if columns is None:
-            columns = self.columns.values
+        if index is None and columns is not None:
+            from . import Signal
+            return self.apply(lambda x: Signal.__call__(x, columns), axis=1)
+        if columns is None and index is not None:
+            from . import Signal
+            return self.apply(lambda x: Signal.__call__(x, index), axis=0)
+
         index, columns = np.array(index), np.array(columns)
         if index.ndim == 0:
             index = np.array([index])

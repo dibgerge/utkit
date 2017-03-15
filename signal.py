@@ -374,10 +374,10 @@ class Signal(pd.Series):
             pks = pks.iloc[:-1]
 
         out = Signal2D(0, index=self.index, columns=np.arange(len(pks)))
-        lims = pd.DataFrame(0, index=['start', 'end'], columns=np.arange(len(pks)))
+        lims = pd.DataFrame(0, index=['start', 'end', 'N'], columns=np.arange(len(pks)))
         for i, ind in enumerate(pks.index):
             win_st, win_end = ind-pulse_width, ind+pulse_width
-            lims[i] = [win_st, win_end]
+            lims[i] = [win_st, win_end, len(self[win_st:win_end])]
             out[i] = self.window(index1=win_st, index2=win_end, win_fcn=win_fcn)
         return out, lims
 
