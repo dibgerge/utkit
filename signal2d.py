@@ -199,8 +199,7 @@ class Signal2D(pd.DataFrame):
         if 'e' in option:
             # make hilbert transform faster by computing it at powers of 2
             n = self.shape[axis]
-            pwr2 = np.log2(n)
-            n = 2**int(pwr2) if pwr2.is_integer() else 2**(int(pwr2) + 1)
+            n = 2**int(np.ceil(np.log2(n)))
             yout = np.abs(hilbert(yout.values, N=n, axis=axis))
             yout = yout[:self.shape[0], :self.shape[1]]
         if 'n' in option:

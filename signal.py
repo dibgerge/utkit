@@ -411,8 +411,7 @@ class Signal(pd.Series):
         yout = self
         if 'e' in option:
             # make hilbert transform faster by computing it at powers of 2
-            pwr2 = np.log2(n)
-            n2 = 2 ** int(pwr2) if pwr2.is_integer() else 2 ** (int(pwr2) + 1)
+            n2 = 2 ** int(np.ceil(np.log2(n)))
             yout = Signal(abs(hilbert(yout.values, N=n2))[:n], index=self.index)
         if 'n' in option:
             yout = yout.normalize(norm_method)
