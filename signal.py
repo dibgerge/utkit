@@ -368,6 +368,8 @@ class Signal(pd.Series):
         if min_dist is None:
             min_dist = pulse_width
         pks = self.peaks(threshold, min_dist)
+        if len(pks) == 0:
+            return Signal2D(), Signal2D()
         if holdoff is not None:
             pks = pks[holdoff:]
         # remove segment if its end is over the limit of signal end
@@ -375,10 +377,10 @@ class Signal(pd.Series):
             pks = pks.iloc[:-1]
 
         out = Signal2D(0, index=self.index, columns=np.arange(len(pks)))
-        lims = pd.DataFrame(0, index=['start', 'end'], columns=np.arange(len(pks)))
+        lims = pd.DataFrame(0, index=['start', 'end', 'N'], columns=np.arange(len(pks)))
         for i, ind in enumerate(pks.index):
             win_st, win_end = ind-pulse_width, ind+pulse_width
-            lims[i] = [win_st, win_end]
+            lims[i] = [win_st, win_end, len(self[win_st:win_end])]
             out[i] = self.window(index1=win_st, index2=win_end, win_fcn=win_fcn)
         return out, lims
 
@@ -412,8 +414,7 @@ class Signal(pd.Series):
         yout = self
         if 'e' in option:
             # make hilbert transform faster by computing it at powers of 2
-            pwr2 = np.log2(n)
-            n2 = 2 ** int(pwr2) if pwr2.is_integer() else 2 ** (int(pwr2) + 1)
+            n2 = 2 ** int(np.ceil(np.log2(n)))
             yout = Signal(abs(hilbert(yout.values, N=n2))[:n], index=self.index)
         if 'n' in option:
             yout = yout.normalize(norm_method)

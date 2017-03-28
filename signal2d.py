@@ -126,10 +126,13 @@ class Signal2D(pd.DataFrame):
         Other keyword arguments are passed directly to the interpolation function
         :func:`scipy.interpolate.griddata`.
         """
-        if index is None:
-            index = self.index.values
-        if columns is None:
-            columns = self.columns.values
+        if index is None and columns is not None:
+            from . import Signal
+            return self.apply(lambda x: Signal.__call__(x, columns), axis=1)
+        if columns is None and index is not None:
+            from . import Signal
+            return self.apply(lambda x: Signal.__call__(x, index), axis=0)
+
         index, columns = np.array(index), np.array(columns)
         if index.ndim == 0:
             index = np.array([index])
@@ -199,8 +202,7 @@ class Signal2D(pd.DataFrame):
         if 'e' in option:
             # make hilbert transform faster by computing it at powers of 2
             n = self.shape[axis]
-            pwr2 = np.log2(n)
-            n = 2**int(pwr2) if pwr2.is_integer() else 2**(int(pwr2) + 1)
+            n = 2**int(np.ceil(np.log2(n)))
             yout = np.abs(hilbert(yout.values, N=n, axis=axis))
             yout = yout[:self.shape[0], :self.shape[1]]
         if 'n' in option:
@@ -260,6 +262,9 @@ class Signal2D(pd.DataFrame):
         axes : int, array_like, optional
             The axes along which to compute the FFT.
 
+        shape : int, array_like, optional
+            The size of the fft
+
         Returns
         -------
         : Signal2D
@@ -271,14 +276,15 @@ class Signal2D(pd.DataFrame):
         :func:`scipy.fftpack.fft2`.
         """
         axes = self._get_axes_numbers(axes)
-        shape = self._cook_args(shape, axes)
+        if shape == 'next':
+            shape = 2 ** np.ceil(np.log2(self.shape))
+            shape = shape[axes[0]] if len(axes) == 1 else shape
 
+        shape = self._cook_args(shape, axes)
         if shape is not None:
             shape = shape.astype(int)
 
         fval = fftshift(fft2(self.values, axes=axes, shape=shape, **kwargs), axes=axes)
-        # pyplot.plot(abs(fval))
-        # pyplot.show()
 
         coords = [self.index, self.columns]
         for ax in axes:
@@ -431,7 +437,6 @@ class Signal2D(pd.DataFrame):
                 break
             n = len(s_seg)
             yf = s_seg.fft(ssb=True, axes=0, **kwargs).abs()
-            print(n, self.shape)
             start += width - overlap
             amp += 2 * yf(fc).values**2 / n
         return amp
@@ -916,11 +921,12 @@ class Signal2D(pd.DataFrame):
 
         return params
 
-
     @property
     def ts(self):
         """ Get the signal sampling period. """
-        return np.mean(np.diff(self.index)), np.mean(np.diff(self.columns))
+        idx = np.mean(np.diff(self.index)) if len(self.index) > 1 else 0
+        col = np.mean(np.diff(self.columns)) if len(self.columns) > 1 else 0
+        return idx, col
 
     @property
     def x(self):
