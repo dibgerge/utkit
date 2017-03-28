@@ -50,8 +50,8 @@ class Signal(pd.Series):
                 index = [index]
 
         super().__init__(data, index, *args, **kwargs)
-        if not self.index.is_monotonic_increasing:
-            raise ValueError('Index must be monotonically increasing.')
+        # if not self.index.is_monotonic_increasing:
+        #     raise ValueError('Index must be monotonically increasing.')
 
     @property
     def _constructor(self):
@@ -102,6 +102,7 @@ class Signal(pd.Series):
         to 'zeros', instead of 'extrapolate'. This is based on the assumption that the signal
         goes to zero outside of its sampled range.
         """
+        # print(ts)
         if key is None and ts is None:
             return self.copy()
         if key is not None and ts is not None:

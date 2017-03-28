@@ -900,12 +900,20 @@ class Signal2D(pd.DataFrame):
             p = 2*np.pi*flocal*a**2/(c * xloc)
             D = 1 - np.exp(1j*p)*(jv(0, p) - 1j*jv(1, p))
             return A * abs(D) * np.exp(-alpha * xloc)
-        # print(amps)
+
         params = pd.DataFrame(0, index=amps.index, columns=['alpha', 'A'])
+        # params = pd.DataFrame(0, index=amps.index, columns=['alpha'])
         for fi in amps.index:
-            popt, pcov = curve_fit(lambda xp, alphap, ap: compute_att(xp, alphap, ap, fi), x,
-                                   amps.loc[fi, :].values, p0=[0.02, 10])
-            params.loc[fi] = popt
+            val = amps.loc[fi, :].values
+            # popt, pcov = curve_fit(lambda xp, alphap, ap: compute_att(xp, alphap, ap, fi), x,
+            #                        val, p0=[0.02, 10])
+            # params.loc[fi] = popt
+            p1 = 2*np.pi*fi*a**2/(c * d)
+            D1 = abs(1 - np.exp(1j*p1)*(jv(0, p1) - 1j*jv(1, p1)))
+            p2 = 2*np.pi*fi*a**2/(c * 2*d)
+            D2 = abs(1 - np.exp(1j*p2)*(jv(0, p2) - 1j*jv(1, p2)))
+            params.loc[fi, 'alpha'] = (1/(2*d))*(np.log(val[0]/val[1]) - np.log(D1/D2))
+
         return params
 
 
