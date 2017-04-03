@@ -203,12 +203,17 @@ class Signal(pd.Series):
         [PeakUtils](http://pythonhosted.org/PeakUtils/)
         """
         y = self.operate('ne') if by_envelop else self.operate('n').abs()
+        # pyplot.plot(y)
+
         if threshold is None:
             threshold = np.sqrt(y.energy()/len(self))
+
         if threshold > 1 or threshold <= 0:
             raise ValueError('Threshold should be in the range (0.0, 1.0].')
+
         if min_dist is None:
             min_dist = self.ts
+
         if min_dist <= 0.0:
             raise ValueError('min_dist should be a positive value.')
         # threshold = threshold * (y.max() - y.min()) + y.min()
@@ -230,6 +235,8 @@ class Signal(pd.Series):
                     rem[sl] = True
                     rem[peak] = False
             peaks = np.arange(y.size)[~rem]
+        # pyplot.plot(y.iloc[peaks], 'or')
+        # pyplot.show()
         return self.iloc[peaks]
 
     def normalize(self, option='max', inplace=False):
@@ -351,6 +358,9 @@ class Signal(pd.Series):
             index. If this is not known exactly, it is generally better to specify this
             parameter to be slightly larger than the actual pulse_width.
 
+        min_dist : float
+            The minimum distance between the peaks of the segmented signals.
+
         holdoff : float, optional
             The minimum index for which to extract a segment from the signal.
 
@@ -367,21 +377,27 @@ class Signal(pd.Series):
         """
         if min_dist is None:
             min_dist = pulse_width
+
         pks = self.peaks(threshold, min_dist)
+
         if len(pks) == 0:
             return Signal2D(), Signal2D()
+
         if holdoff is not None:
             pks = pks[holdoff:]
+
         # remove segment if its end is over the limit of signal end
         if pks.index[-1] + pulse_width > self.index[-1]:
             pks = pks.iloc[:-1]
 
         out = Signal2D(0, index=self.index, columns=np.arange(len(pks)))
         lims = pd.DataFrame(0, index=['start', 'end', 'N'], columns=np.arange(len(pks)))
+
         for i, ind in enumerate(pks.index):
             win_st, win_end = ind-pulse_width, ind+pulse_width
             lims[i] = [win_st, win_end, len(self[win_st:win_end])]
             out[i] = self.window(index1=win_st, index2=win_end, win_fcn=win_fcn)
+
         return out, lims
 
     def operate(self, option='', norm_method='max', inplace=False):
@@ -655,9 +671,9 @@ class Signal(pd.Series):
         f, pxx = welch(self.values, fs=self.fs, nperseg=nperseg, noverlap=nol, **kwargs)
         return Signal(pxx, index=f)
 
-    def psd_feature(self, fc, width, overlap=0, nfft=None):
+    def sparse_pse(self, threshold, fc, pulse_width, overlap=0, nfft=None, win_fcn='boxcar'):
         """
-
+        Computes the sparse power spectral estimate
         Parameters
         ----------
         fc
@@ -669,17 +685,43 @@ class Signal(pd.Series):
         -------
 
         """
-        start = self.index[0]
-        amp = 0
+        echoes, lims = self.segment(threshold=threshold, pulse_width=pulse_width,
+                                    min_dist=pulse_width-overlap, win_fcn=win_fcn)
+        if echoes.shape[1] == 0:
+            return Signal(0, index=[0])
+        Y = echoes.fft(shape=nfft, axes=0, ssb=True).abs()**2
+        return Y(index=fc)
+
+    def pse(self, fc, pulse_width, overlap=0, nfft=None, win_fcn='boxcar'):
+        """
+        Computes the continuous power spectral estimate.
+
+        Parameters
+        ----------
+        fc
+        pulse_width
+        overlap
+        nfft
+        win_fcn
+
+        Returns
+        -------
+
+        """
+        if overlap >= pulse_width:
+            raise ValueError('overlap should be smaller than pulse_width.')
+
+        delay = 0
+        a = 0
         nbins = 0
-        nsamples = len(self.loc[start:(start + width)])
-        while start + width <= self.index[-1]:
+        while delay + pulse_width <= self.index[-1]:
+            s = self.window(index1=delay, index2=delay+pulse_width, win_fcn=win_fcn)
+            Y = s.fft(ssb=True, nfft=nfft).abs()
+            a += Y(fc)**2
             nbins += 1
-            s_seg = self.loc[start:(start + width)]
-            yf = s_seg.fft(ssb=True, nfft=nfft).abs()
-            start += width - overlap
-            amp += (yf(fc).values[0])**2
-        return nbins, nsamples, amp
+            delay += pulse_width-overlap
+
+        return a, nbins
 
     def coherence(self, other, width, overlap=0, **kwargs):
         """

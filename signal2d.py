@@ -415,31 +415,31 @@ class Signal2D(pd.DataFrame):
         ift = ifft2(vals, axes=axes, shape=np.array(self.shape)[axes])
         return Signal2D(np.real(ift), index=self.index, columns=self.columns)
 
-    def psd_feature(self, fc, width, overlap=0, **kwargs):
-        """
-        Currently only along the 0 axis.
-        Parameters
-        ----------
-        fc
-        width
-        overlap
-        nfft
-
-        Returns
-        -------
-
-        """
-        start = self.index[0]
-        amp = 0
-        while start < self.index[-1]:
-            s_seg = self.loc[start:(start + width)]
-            if len(s_seg) <= 1:
-                break
-            n = len(s_seg)
-            yf = s_seg.fft(ssb=True, axes=0, **kwargs).abs()
-            start += width - overlap
-            amp += 2 * yf(fc).values**2 / n
-        return amp
+    # def periodogram(self, pulse_width, axes=0, fc='max', overlap=0, **kwargs):
+    #     """
+    #     Currently only along the 0 axis.
+    #     Parameters
+    #     ----------
+    #     fc
+    #     width
+    #     overlap
+    #     nfft
+    #
+    #     Returns
+    #     -------
+    #
+    #     """
+    #     start = self.index[0]
+    #     amp = 0
+    #     while start < self.index[-1]:
+    #         s_seg = self.loc[start:(start + width)]
+    #         if len(s_seg) <= 1:
+    #             break
+    #         n = len(s_seg)
+    #         yf = s_seg.fft(ssb=True, axes=0, **kwargs).abs()
+    #         start += width - overlap
+    #         amp += 2 * yf(fc).values**2 / n
+    #     return amp
 
     def shift_axes(self, shift, axes=None):
         """
