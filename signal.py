@@ -4,7 +4,7 @@ from scipy.fftpack import fft, fftfreq, fftshift, ifft
 from scipy.signal import get_window, hilbert, fftconvolve, spectrogram, welch, coherence
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import simps
-from . import peakutils
+#from . import peakutils
 from .signal2d import Signal2D
 from matplotlib import pyplot
 from scipy.special import jv
