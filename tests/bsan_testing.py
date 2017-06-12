@@ -71,7 +71,7 @@ def interp(option='linear'):
 
 
 def interp_spline():
-    bscan = civa_bscan(join('..', 'data', 'B02_K_5MHz_60S_-x_HalfInch_bscan.txt'))
+    bscan = civa_bscan(join('..', 'data', 'civa_bscan.txt'))
     gridx, gridy = np.mgrid[20e-6:50e-6:50j, 0.:30e-3:50j]
     from scipy.interpolate import griddata
     s = bscan.stack()
